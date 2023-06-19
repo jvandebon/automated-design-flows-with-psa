@@ -36,7 +36,6 @@ def locations_filter(loop, locations):
 def parallel_filter(loop):
     reads, writes, schedule = build_polyhedral_model(loop)
     parallel = is_parallel(reads,writes,schedule,get_loop_info(loop)['idx'])
-    # print(f"loop at {loop.location} - parallel? {parallel}")
     return parallel
 
 def parse_omp_parallel_loop_pragmas(pragma):
@@ -47,7 +46,6 @@ def parse_omp_parallel_loop_pragmas(pragma):
 
 def omp_parallel_loop_filter(loop):
     return loop.pragmas is not None and any([p[0] for p in loop.pragmas if len(p[0]) > 3 and " ".join(p[0][0:3]) == "omp parallel for"])
-
 
 def get_all_referenced_vars(node):
     decl_refs = node.query("dr{DeclRefExpr}", where=lambda dr: not function_type(dr.type))
@@ -78,9 +76,7 @@ def get_called_fns(ast, fn):
     get_called_fns_(ast,fn,results)
     return results
 
-
 def range_overlaps(range1, range2):
-    # (StartA <= EndB) and (EndA >= StartB)
     if range1['min'] <= range2['max'] and range1['max'] >= range2['min']:
         return True
     return False
@@ -95,8 +91,9 @@ def build_points_to_map(pointer_ranges):
                 alias_map[p1].append(p2)
     return alias_map
 
-# bfs based approach to check if there is a path between two nodes
+
 def is_reachable(n1, n2, adj_map):
+    # bfs approach to check if there is a path between two nodes
     visited = []
     q = []
     visited.append(n1) 
@@ -138,7 +135,6 @@ def read_or_write_param(param, fn):
 
 # determine if a variable reference is reading or writing or both
 def read_or_write(ref):
-    # print(ref.unparse(), ref.location)
     if ref.access.is_used and ref.access.is_def:
         return 'RW'
     elif ref.access.is_used:
@@ -160,10 +156,7 @@ def inline_fn(ast, scope, call, fn=None):
     fn_params = fn.signature.params
     call_args = call.args
     inlined_code = ""
-
-    # print(fn.unparse())
     ret = fn.query("r{ReturnStmt}")
-
 
     # initialise func params as call args
     # note: assumes no pointer args are derived (e.g. f(a+10) or f(&a[10]) where a is a pointer)
@@ -180,7 +173,6 @@ def inline_fn(ast, scope, call, fn=None):
     # insert func body 
     inlined_code += fn.body.unparse()[1:-1]
     
-
     if ret:
         ret_stmt = ret[0].r.unparse().strip()
         inlined_code = inlined_code.replace(ret_stmt, "") # remove return stmt from inline
@@ -190,7 +182,6 @@ def inline_fn(ast, scope, call, fn=None):
     else:
         call.instrument(Action.replace, code=inlined_code)
         call.instrument(Action.remove_semicolon, verify=False)
-
 
 def pragma_to_dict(pragma):
     if not pragma:
@@ -317,7 +308,6 @@ def dep_map_handler(m, deps):
     d = m.domain()
     r = m.range()
     sink = r.get_tuple_name()
-    # print("\nStmt", r.get_tuple_name(), "depends on stmt", d.get_tuple_name(), "with the following constraints:")
     exp = m.simple_hull()
     constraints = [c for c in exp.get_constraints() if c.is_equality()]
     dep = {'sink': sink, 'src': d.get_tuple_name(), 'dists':[]}
@@ -330,17 +320,16 @@ def dep_map_handler(m, deps):
                 dist = int(str(coefs[i]))
             else:
                 var = i
-                # TODO: can coefs[i] be anything other than 1? check for more complex deps 
+                # TODO: check for more complex deps 
         dep['dists'].append((var, dist))
     if not sink in deps:
         deps[sink] = []
     deps[sink].append(dep)
 
-#TODO: if there are multiple deps in one stmt, how to match var to dep?
+#TODO: if there are multiple deps in one stmt, match var to dep
 def sink_map_handler(m, vars):
     stmt = m.domain().get_tuple_name()
     var = m.range().get_tuple_name()
-    # print("There is a dependency on array", r.get_tuple_name(), "in stmt", d.get_tuple_name())
     if not stmt in vars:
         vars[stmt] = []
     vars[stmt].append(var)
@@ -398,23 +387,8 @@ def is_loop_parallel(raw_deps, war_deps, waw_deps, idx_var):
 
 def analyse_loop_deps(reads, writes, schedule, debug=False):
     raw_deps = analyse_raw_deps(reads, writes, schedule)
-    if debug and raw_deps != False:
-        print("----------------------------------------")
-        print("********** RAW dependencies: **********")
-        print(raw_deps[0], "\n", raw_deps[1])
-
     war_deps = analyse_war_deps(reads, writes, schedule)
-    if debug and war_deps != False: 
-        print("----------------------------------------")
-        print("********** WAR dependencies: **********")
-        print(war_deps[0], "\n", war_deps[1])
-
     waw_deps = analyse_war_deps(reads, writes, schedule)
-    if debug and waw_deps != False:
-        print("----------------------------------------")
-        print("********** WAW dependencies: **********")
-        print(waw_deps[0], "\n", waw_deps[1])
-    
     return raw_deps, war_deps, waw_deps
 
 def process_stmts(loop):
@@ -435,7 +409,6 @@ def process_stmts(loop):
             continue
         stmt_info[stmt[0].id] = {"loops": stmt[1], "order": stmt[2], "stmt": stmt[0]}
         stmt_info[stmt[0].id]["var_refs"] = stmt[0].query("ref{DeclRefExpr}")
-        # print(stmt[0].id, '-->', stmt[0].location)
     return stmt_info 
 
 def generate_stmt_instance_identifiers(stmt_info):
@@ -486,7 +459,6 @@ def array_access_relation(stmt_instance_id, ref, stmt_domain, arr_constraint, sy
                 if var not in symbol_map:
                     symbol_map[var] = str(random.randint(1,10))
                 idx = idx.replace(var, symbol_map[var])
-                # print(symbol_map)
             else:
                 to_check.append(var)
     symbols = check_symbolic_vars(to_check)
@@ -578,7 +550,6 @@ def build_polyhedral_model(loop, debug=False):
 
     local_vars = [v.name for v in get_local_var_list(loop)]
     stmt_info = process_stmts(loop)
-    # print(stmt_info)
     if not stmt_info:
         return None, None, None
     try:
@@ -619,7 +590,6 @@ def is_parallel(reads, writes, schedule, idx_var, debug=False):
 def check_loop(loop, idx_var, debug=False):
     reads, writes, schedule = build_polyhedral_model(loop, debug=debug)
     parallel = is_parallel(reads,writes,schedule,idx_var,debug=debug)
-    # print("%s loop at %s parallel:" % (idx_var, str(loop.location)), parallel)
 
 
 def report_deps(loop, debug=True):

@@ -48,9 +48,7 @@ class design_flow:
             self.ast = Ast(src).clone(dest)  
             self.src = src
             self.dest = dest      
-            # normalisation:
             self.normalise()
-            # build typedef map
             self.build_typedef_map()
         else:
             self.ast = ast.clone(dest)

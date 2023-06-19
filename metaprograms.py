@@ -162,7 +162,6 @@ def pointer_alias_analysis(ast, fn_name, debug=False):
     pairs = [(p1,p2) for p1 in pointer_params for p2 in pointer_params if p1 != p2]
     aliasing_pairs = [is_reachable(p[0],p[1],points_to_map) for p in pairs]
     alias_pairs = [pairs[idx] for idx in [i for i, x in enumerate(aliasing_pairs) if x == True]]
-
     # return pairs of parameters that may alias
     return alias_pairs
 

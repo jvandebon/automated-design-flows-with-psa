@@ -106,9 +106,6 @@ def introduce_shared_mem_buffers(ast, data, param=None, max_size=10000):
     wrapper_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == f"{kernel_fn.name}_wrapper_")[0].fn
     introduce_shared_mem(ast, kernel_fn, wrapper_fn, data['data_inout_report'], data['struct_map'], max_size=max_size)
 
-
-# IN PROGRESS BELOW:
-
 def unroll_until_fpga_overmap(ast,data,target='a10'):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     unroll_until_overmap_dse(ast, kernel_fn, target=target)     

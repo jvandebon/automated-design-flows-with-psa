@@ -5,7 +5,8 @@ import numpy as np
 import os 
 
 def get_kernel_signature(fn, restrict):
-     # TODO: currently checking that all pointers are alias free, can check individually for aliasing
+     # TODO: currently checks that all pointers are alias free,
+     # could check individually for aliasing
     params = fn.signature.params
     new_params = []
     if restrict:
@@ -36,7 +37,6 @@ def generate_hip_kernel(ast, fn, restrict):
         decl = f[1]
         decl.instrument(Action.before, code="__device__ __host__ ")
 
-    # TODO: determine problem size, needs to be power of 2, could be symbolic 
     loop = fn.query('l{loop}', where=lambda l: l.is_outermost())[0].l
     problem_size = get_loop_info(loop)['end']
 
@@ -80,7 +80,6 @@ def map_to_hip_gpu(ast, fn, restrict=False):
                 exit(1)
             rw = read_or_write_param(param, fn)
             wrapper_fn_pointer_decls += param.unparse() + "_gpu;\n"
-            #TODO:FIX
             wrapper_fn_pointer_decls = wrapper_fn_pointer_decls.replace("const", "")
             wrapper_fn_hipmalloc += hipmalloc_template  % (param.name+"_gpu", size)
             wrapper_fn_hipfree += "hipFree(%s_gpu);\n" % param.name
@@ -216,50 +215,13 @@ def introduce_shared_mem_buf_hip(kernel, kernel_wrapper, pointer_param, struct_m
     for row in refs:
         row.ref.instrument(Action.replace, code=f"{pointer_var}_cache")
 
-    # with open('debug.cpp', 'w') as d_file:
-    #     for src in ast.sources:
-    #         d_file.write(src.module.unparse(changes=True)+"\n\n\n")
-
-
 def introduce_shared_mem(ast, kernel_fn, wrapper_fn, report, struct_map, max_size=10000):
     params = [el for el in report if el != 'summary' and 'R' in report[el]['rw'] and report[el]['size'] < max_size]
-    print("inserting shared bufs for:", params)
     for param in params:
         kernel_param = [p for p in kernel_fn.signature.params if p[1] == param][0]
         introduce_shared_mem_buf_hip(kernel_fn, wrapper_fn, kernel_param, struct_map)
         ast.commit()
     ast.sync(commit=True)
-
-def remove_loop_arr_deps_hip(ast, kernel_fn, arr_var):
-    refs = ast.query("f{FunctionDecl} => loop{ForStmt} => arr{ArraySubscriptExpr}", where=lambda f, arr: f.name == kernel_fn and arr.children[0].name == arr_var)
-    print(kernel_fn, arr_var)
-    # fn = ast.query("fn{FunctionDecl}", where=lambda fn: fn.name == kernel_fn)
-    # fn[0].fn.tree()
-    # print(refs)
-    while refs:
-        print(refs[0].loop.location, refs[0].arr.parent.unparse())
-        remove_loop_arr_dep_with_scalar(refs[0].loop, refs[0].arr)
-        ast.commit()
-        refs = ast.query("f{FunctionDecl} => loop{ForStmt} => arr{ArraySubscriptExpr}", where=lambda f, arr: f.name == kernel_fn and arr.children[0].name == arr_var)
-
-#TODO: currently assumes only one reference in loop (check if var decl already exists)
-def remove_loop_arr_dep_with_scalar(loop, arr_ref):
-    
-    if arr_ref.parent.isentity('MemberRefExpr'):
-        arr_ref = arr_ref.parent
-
-    new_var = "_"+arr_ref.unparse().replace("]","").replace("[","").replace(".","")+"_"
-
-    # initialise new scalar variable
-    initialise_var = f"{arr_ref.type.spelling} {new_var} = {arr_ref.unparse()};\n"
-    loop.instrument(Action.before, code=initialise_var)
-
-    # replace references to var in loop
-    arr_ref.instrument(Action.replace, code=new_var)
-
-    # assign value back to array variable
-    assign_value = f"\n{arr_ref.unparse()} = {new_var};"
-    loop.instrument(Action.after, code=assign_value)
 
 class HIPKernelTimer:
     def __init__(self, ast):
@@ -335,10 +297,6 @@ class HIPKernelTimer:
                     e2e_time += el[1]
             compute_times.append(compute_time)
             e2e_times.append(e2e_time)
-
-        # if not debug:
-        #     subprocess.run(['cat', self.ast.workdir+"/outputs.txt"])
-        #     self.ast.discard()
 
         return e2e_times, compute_times
 

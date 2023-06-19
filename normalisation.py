@@ -10,7 +10,6 @@ def add_scope(node):
     node.instrument(Action.remove_semicolon, verify=False)
 
 def scopify(ast):
-    
     # scopify loops
     wave = 1
     while True:
@@ -23,7 +22,6 @@ def scopify(ast):
             add_scope(row.forloop.body)
         ast.commit()
         wave += 1
-
     # scopify conditionals
     wave = 1
     while True:
@@ -54,9 +52,7 @@ def separate_vardecl_and_init(ast):
             # HACK: catches a case std::ofstream ofile; -- tries to set ofile = ofile;
             # TODO: debug issue with = {0}
             continue
-        # print(row.vd.unparse()[:row.vd.unparse().rindex('=')])
         new_decl = "%s;\n" % row.vd.unparse()[:row.vd.unparse().index('=')]
-        # new_decl = "%s %s;\n" % (row.vd.type.spelling, row.vd.name)
         new_init = "%s = %s;" % (row.vd.name, row.vd.children[-1].unparse())
         row.ds.instrument(Action.replace, code="%s%s\n" % (new_decl, new_init))
     ast.commit()
@@ -65,7 +61,6 @@ def find_scope(node):
     while node and not node.isentity('CompoundStmt'):
         node = node.parent
     return node
-
 
 def normalise_pointer_dereferences(ast):
     results = ast.query('uop{UnaryOperator} ={1}> p{ParenExpr}', where=lambda uop: uop.symbol == '*')
@@ -78,7 +73,6 @@ def normalise_pointer_dereferences(ast):
         row.uop.instrument(Action.replace, code="%s[%s]"%(pointer.name, row.p.unparse().replace(pointer.name, '0')))
     ast.commit()
 
-
 def inline_fns_with_loops(ast):
     # find function calls inside loops
     calls = set([row.c for row in ast.query('l{ForStmt} => c{CallExpr}')])
@@ -87,7 +81,6 @@ def inline_fns_with_loops(ast):
         fn = ast.query("fn{FunctionDecl}=>l{ForStmt}", where=lambda fn: fn.name == call.name and fn.body)
         if not fn:
             continue
-        print("***** INLINING: ", call.unparse(), call.location)
         inline_fn(ast,fn[0].fn, call)
     ast.sync(commit=True)
 

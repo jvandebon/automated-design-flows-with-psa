@@ -191,98 +191,6 @@ def usm_malloc_free(base_type, name, size, host_or_device):
     free = "sycl::free(%s_ptr,q);\n" % name 
     return malloc, free
 
-def fn_to_oneapi_kernel_zerocopydatatransfer(fn, kernel_name, restrict, device_ptrs, timers=True):
-    params = fn.query('p{ParmDecl}')
-    param_names = [row.p.name for row in params]
-    pointer_params = [row.p for row in params if pointer_type(row.p.type)] 
-
-    usm_mallocs = ""
-    copy_events = ""
-    copy_to_usm = ""
-    copy_to_host = ""
-    usm_cleanup = ""
-    usm_ptrs = ""
-    to_replace = []
-
-    for param in pointer_params:
-        size = "%s_size_" % param.name
-        if not size in param_names:
-            print("Can't determine size of pointer: %s, exiting..." % param.name)
-            exit(1)
-        rw = read_or_write_param(param, fn)
-        base_type = type_of(param)
-
-        # TODO: FIX MEMCPY RW
-        if param.name == 'output':
-            rw = 'W'
-
-        # if device pointers: malloc device, copy over
-        if param.name in device_ptrs or rw == "RW":
-            malloc, free = usm_malloc_free(base_type, param.name, size, "device")
-            copy_events += "auto %s_to_device = q.memcpy(%s_ptr, %s, %s);\n%s_to_device.wait();\n" % (param.name, param.name, param.name, size, param.name)
-            usm_mallocs += malloc 
-            usm_cleanup += free  
-            usm_ptrs += "device_ptr<%s> %s__(%s_ptr);\n" % (base_type, param.name, param.name)
-            to_replace.append((param.name, param.name+"__"))
-            # TODO: copy back to device if RW 
-            continue       
-
-        # if read only: malloc host, memcopy
-        if rw == 'R':
-            malloc, free = usm_malloc_free(base_type, param.name, size, "host")
-            copy_to_usm += "memcpy(%s_ptr, %s, %s);\n" % (param.name, param.name, size)
-            usm_mallocs += malloc 
-            usm_cleanup += free   
-            usm_ptrs += "host_ptr<%s> %s__(%s_ptr);\n" % (base_type, param.name, param.name)
-            to_replace.append((param.name, param.name+"__"))
-
-        # if write only: malloc host 
-        if rw == 'W':
-            malloc, free = usm_malloc_free(base_type, param.name, size, "host")
-            copy_to_host += "memcpy(%s, %s_ptr, %s);\n" % (param.name, param.name, size)
-            usm_mallocs += malloc 
-            usm_cleanup += free   
-            usm_ptrs += "host_ptr<%s> %s__(%s_ptr);\n" % (base_type, param.name, param.name)
-            to_replace.append((param.name, param.name+"__"))
-
-    # wrap body in cgh.single_task
-    directives = ""
-    if restrict:
-        directives += "[[intel::kernel_args_restrict]]"
-    kernel_lambda = "cgh.single_task<class %s>([=]() %s { %s %s});\n" % (kernel_name, directives, usm_ptrs, fn.body.unparse()[1:-1])
-
-    # wrap kernel lambda in auto evt = ...; evt.wait();
-    kernel_event = "auto evt = q.submit([&](handler& cgh) {\n%s});\nevt.wait();\n" % (kernel_lambda)
-
-    timer_start = ""
-    timer_report = ""
-    if timers:
-        timer_start = "auto kernel_start = std::chrono::high_resolution_clock::now();\n"
-        timer_report = """auto kernel_end = std::chrono::high_resolution_clock::now();
-                     auto t_kernel = (std::chrono::duration_cast<std::chrono::nanoseconds>(kernel_end-kernel_start)).count()/1e6;
-                     printf(\"Kernel Time: %.6fms\\n\", t_kernel);\n"""
-
-    # # put all kernel pieces together
-    kernel_fn_body = "%s%s%s%s%s%s%s%s" % (usm_mallocs, copy_to_usm, copy_events, timer_start, kernel_event, timer_report, copy_to_host, usm_cleanup)
-
-    # add queue argument to function
-    params = ["%s %s" % (p[0].spelling, p[1]) for p in fn.signature.params] + ["queue q"]
-    sig = "%s %s(%s)" % (fn.signature.rettype.spelling, fn.name, ','.join(params))
-
-    # replace function with new kernel version
-    fn.instrument(Action.replace, code="%s{\n%s\n}" % (sig, kernel_fn_body))
-    
-    # # replace old pointer references to new device pointers (can't instrument all at once, sync first)
-    ast = fn.ast
-    with open('debug.cpp', 'w') as d_file:
-        for src in ast.sources:
-            d_file.write(src.module.unparse(changes=True)+"\n\n\n")
-    ast.commit()
-    kernel = ast.query('f{FunctionDecl} => evt{LambdaExpr} => kernel{LambdaExpr}', where=lambda f: f.name == fn.name)[0].kernel
-    for i,j in to_replace:
-        replace_var_refs(kernel, i, j)
-
-
 def basic_kernel_to_zerocopy(ast, kernel_fn):
 
     data = {}
@@ -420,27 +328,8 @@ def map_to_oneapi_explicitmem(ast, fn, restrict=False, kernel_name="Kernel"):
     loop_kernel_calls_for_warmup(ast, kernel_name)
     ast.commit()
 
-def map_to_oneapi_zerocopydatatransfer(ast, fn, restrict=False, kernel_name="Kernel", device_ptrs=[]):
-    # find call to fn (make sure only in a single function scope)
-    calls = ast.query('fndecl{FunctionDecl} => c{CallExpr}', where=lambda c: c.name == fn.name)
-    if not calls or len(set([row.fndecl for row in calls])) > 1:
-        print("Calls to kernel from different functions, not supported.\n")
-        return
-
-    # sycl housekeeping code
-    sycl_housekeeping(fn, kernel_name)
-
-    # setup device queue
-    setup_device_queue(calls)
-
-    fn_to_oneapi_kernel_zerocopydatatransfer(fn, kernel_name, restrict, device_ptrs)
-    ast.commit()
-    loop_kernel_calls_for_warmup(ast, kernel_name)
-    ast.commit()
-
 def remove_pragma(pragma):
     return ""
-
 
 def unroll_fixed_oneapi_loops(ast, scope, max_iters=100):
     loops = scope.query('l{ForStmt}', 
@@ -452,12 +341,7 @@ def unroll_fixed_oneapi_loops(ast, scope, max_iters=100):
         unroll_loop(ast, row.l, remove=False)
     ast.commit()
 
-
-def remove_pragma(pragma):
-    return ""
-
-def unroll_loop(ast, loop, factor="", remove=True
-):
+def unroll_loop(ast, loop, factor="", remove=True):
     if remove and loop.pragmas:
         loop.instrument(Action.pragmas,fn=remove_pragma)
         loop, = ast.commit(track=[loop])
@@ -469,7 +353,6 @@ def parse_unroll_pragmas(pragma):
         return "loop"
     else:
         return False # exclude pragma
-
 
 def unroll_until_overmap_dse(ast, kernel, target='a10'):
     outer_loop = kernel.query('l{ForStmt}', where=lambda l: l.is_outermost())[0].l
@@ -501,7 +384,7 @@ def unroll_until_overmap_dse(ast, kernel, target='a10'):
         percents = new_percents
         overmapped = [p > 100 for p in percents]
         ii = loop_info[outer_loop.id]['II']
-        print('ii='+ii, percents, overmapped,)
+        print('unroll by', n, 'ii='+ii, percents)
 
     # rollback 
     n/=2

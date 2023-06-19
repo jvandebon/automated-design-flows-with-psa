@@ -3,18 +3,6 @@
 from meta_cl import *
 from util import * 
 
-# def omp_loop_pragmas(pragma):
-#     if " ".join(pragma[0:3]) == "omp parallel for":
-#         return "loop" 
-#     else:
-#         return False
-
-# def omp_loop_filter(loop):
-#     if loop.pragmas is not None:
-#         print(loop.pragmas)
-#         return True
-#     return False
-
 class LoopTimeProfiler:
     def __init__(self, ast):
         # clone the ast for instrumentation and execution
@@ -283,12 +271,10 @@ class DataInOutProfiler:
         main_src = results[0].src
 
         # instrument with include and ARTISAN MEM INIT
-        # main_src.instrument(Action.before, code="#include <meta_cl>\nusing namespace meta_cl;\nARTISAN_MEM_INIT\n")
         incl_artisan(main_src, mem_init=True)
 
         other_srcs = self.ast.query(select="src{Module}", where=lambda src: src.tag != main_src.tag)
         for res in other_srcs:
-            # res.src.instrument(Action.before, code="#include <meta_cl>\nusing namespace meta_cl;\n")
             incl_artisan(res.src)
 
         # find all dynamic pointer allocations in application, instrument to register
@@ -393,10 +379,8 @@ class MemoryFootprintProfiler:
             # avoid double counting subsequent accesses to the same idx
             count_updates = ""
             if 'R' in rw:
-                # count_updates += f"if ( ({idx}) != {var}_read_idx_) {{ {var}_read_count__+=sizeof({access_type}); {var}_read_idx_ = ({idx}); }}" 
                 count_updates += f"{var}_read_count__+=sizeof({access_type});" 
             if 'W' in rw:
-                # count_updates += f"if ( ({idx}) != {var}_write_idx_) {{ {var}_write_count__+=sizeof({access_type}); {var}_write_idx_ = ({idx}); }}"
                 count_updates += f"{var}_write_count__+=sizeof({access_type});" 
  
             if stmt not in to_instrument:
@@ -441,83 +425,3 @@ class MemoryFootprintProfiler:
 
         if not debug:
             self.ast.discard()
-
-
-class HIPKernelTimer:
-    def __init__(self, ast):
-        # clone the ast for instrumentation and execution
-        self.ast = ast.clone('debug-kernel-timer/', changes=True) 
-        self.data = None
-
-    # returns profiling data
-    def run(self, num_runs=1, debug=False):
-
-        # find kernel launch function call - hip macro instantiation
-        kernel_launch = self.ast.query('src{Module} => mi{MacroInstantiation}', where=lambda mi: mi.unparse().startswith("hipLaunchKernelGGL"))
-        if len(kernel_launch) == 0:
-            print("Can't find kernel launch function to time. Returning.")
-            return
-        src1 = kernel_launch[0].src
-        kernel_launch = kernel_launch[0].mi
-        
-        # find kernel wrapper function call 
-        kernel_wrapper = self.ast.query(select='src{Module} => call{CallExpr}', where=lambda call: call.name == '__kernel___wrapper_')
-        if len(kernel_wrapper) == 0:
-            print("Can't find kernel wrapper function to time. Returning.")
-            return
-
-        src2 = kernel_wrapper[0].src
-        kernel_call = kernel_wrapper[0].call
-        srcs = set([src1, src2])
-        
-        # include header <artisan> on sources
-        for src in srcs:
-            src.instrument(Action.before, code="#include <artisan>\n")
-
-        # instrument wrapper function to add a timer
-        kernel_call.instrument(Action.before, code='{ artisan::Timer __kernel_timer__([](double t) { artisan::Report::write("- e2e-timer: %f", t); });')
-        kernel_call.instrument(Action.after, code=';}')
-
-        # instrument launch call to add a timer and synchronise mechanisms 
-        kernel_launch.instrument(Action.before, code='hipDeviceSynchronize();\n{ artisan::Timer __kernel_timer__([](double t) { artisan::Report::write("- compute-timer: %f", t); });\n')
-        kernel_launch.instrument(Action.after, code=';\nhipDeviceSynchronize();\n}')
-
-        # step 3: query main function
-        results2 = self.ast.query("fn{FunctionDecl}", where=lambda fn: fn.name == 'main')
-
-        for res in results2:
-            res.fn.instrument(Action.begin,
-                              code='artisan::Report::start(); int ret = [] (auto argc, auto argv) { ')
-            res.fn.instrument(Action.end,
-                              code='  }(argc, argv);'
-                                   'artisan::Report::emit("profile");'
-                                   'artisan::Report::end();'
-                                   'return ret;')
-
-        # sync AST to execute
-        self.ast.sync()
-
-        # run
-        def report(ast, data):
-            self.data = data
-
-        e2e_times = []
-        compute_times = []
-        for iter in range(0,num_runs):
-            self.ast.exec(rule='gpu')
-            self.ast.exec(rule='run_gpu', report=report)
-            compute_time = 0
-            e2e_time = 0 
-            for el in self.data['profile']:
-                if 'compute-timer' in el:
-                    compute_time += el['compute-timer']
-                if 'e2e-timer' in el:
-                    e2e_time += el['e2e-timer']
-            compute_times.append(compute_time)
-            e2e_times.append(e2e_time)
-
-        if not debug:
-            subprocess.run(['cat', self.ast.workdir+"/outputs.txt"])
-            self.ast.discard()
-
-        return e2e_times, compute_times
