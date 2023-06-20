@@ -3,9 +3,12 @@
 from util import *
 from oneapi import *
 from hip import *
+from openmp import *
 from meta_cl import *
 from metaprograms import *
 
+## every design flow pattern has a uniform interface: pattern_name(ast, data, { optional named params })
+## so that they can be added to design_flow objects (see design_flow.py)
 
 def extract_hotspot(ast, data, filter_fn=outermost_filter, threshold=0.5, fn_name='__kernel__'):
     candidate_loops = identify_hotspot_loops(ast, threshold, filter_fn=filter_fn)
@@ -14,7 +17,7 @@ def extract_hotspot(ast, data, filter_fn=outermost_filter, threshold=0.5, fn_nam
     ast.sync(commit=True)
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == fn_name)[0].fn
     inline_functions_with_pointer_args(ast, kernel_fn)
-    kernel_fn_new = ast.commit(track=[kernel_fn])[0]
+    kernel_fn_new, = ast.commit(track=[kernel_fn])
     data['device_fns'] = [fn_name] + [fn[0] for fn in get_called_fns(ast, kernel_fn_new)]
 
 def loop_tripcount_analysis(ast, data, debug=False, exec_rule=''):
@@ -40,31 +43,31 @@ def loop_dependence_analysis(ast, data, *args):
     deps = analyse_loop_dependencies(ast, data['hotspot_fn_name'])
     data['loop_dep_report'] = deps
 
-def generate_hip_design(ast, data):
+def generate_hip_design(ast, data, *args):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     map_to_hip_gpu(ast, kernel_fn, restrict=data['pointer_alias_report']['restrict'])
     ast.sync(commit=True)
 
-def employ_sp_fp_literals(ast, data):
+def employ_sp_fp_literals(ast, data, *args):
     use_sp_fp_literals(ast, data['device_fns'])
     ast.sync(commit=True)
 
-def employ_sp_math_fns(ast, data):
+def employ_sp_math_fns(ast, data, *args):
     use_sp_math_functions(ast, data['device_fns'])
     ast.sync(commit=True)
 
-def employ_reciprocal_math_fns(ast, data):
+def employ_reciprocal_math_fns(ast, data, *args):
     use_reciprocal_math_functions(ast, data['device_fns'])
     ast.sync(commit=True)
 
-def employ_hip_pinned_memory(ast, data):
+def employ_hip_pinned_memory(ast, data, *args):
     use_pinned_memory(ast)
     ast.sync(commit=True)
 
 def hip_blocksize_timing_DSE(ast, data, device=None):
     time_kernel_bs_DSE(ast, data['hotspot_fn_name'], device=device)
 
-def multithread_parallel_loops(ast, data):
+def multithread_parallel_loops(ast, data, *args):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     openmp_multithread_loops(ast, kernel_fn)
     ast.sync(commit=True)
@@ -82,15 +85,12 @@ def remove_compound_assignment_deps(ast, data, *args):
 def omp_nthreads_dse(ast, data, max_threads=32):
     run_openmp_num_threads_DSE(ast, max_threads)
 
-def generate_oneapi_design(ast, data, zerocopydata=False):
+def generate_oneapi_design(ast, data, *args):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
-    if zerocopydata:
-        map_to_oneapi_zerocopydatatransfer(ast, kernel_fn, data['pointer_alias_report']['restrict'], kernel_fn.name, device_ptrs=[])
-    else:
-        map_to_oneapi_basic(ast, kernel_fn, data['pointer_alias_report']['restrict'], kernel_fn.name)
+    map_to_oneapi_basic(ast, kernel_fn, data['pointer_alias_report']['restrict'], kernel_fn.name)
     ast.sync(commit=True)
 
-def use_oneapi_zerocopy_memory(ast,data):
+def use_oneapi_zerocopy_memory(ast,dat,*args):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     basic_kernel_to_zerocopy(ast,kernel_fn)
     ast.sync(commit=True)
@@ -100,12 +100,11 @@ def unroll_small_fixed_bound_loops(ast, data, max_iters=20):
     unroll_fixed_oneapi_loops(ast, kernel_fn, max_iters=max_iters)
     ast.sync(commit=True)
 
-
 def introduce_shared_mem_buffers(ast, data, param=None, max_size=10000):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     wrapper_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == f"{kernel_fn.name}_wrapper_")[0].fn
     introduce_shared_mem(ast, kernel_fn, wrapper_fn, data['data_inout_report'], data['struct_map'], max_size=max_size)
 
-def unroll_until_fpga_overmap(ast,data,target='a10'):
+def unroll_until_fpga_overmap(ast, data, target='a10'):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     unroll_until_overmap_dse(ast, kernel_fn, target=target)     

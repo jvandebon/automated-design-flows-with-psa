@@ -8,14 +8,10 @@ import numpy as np
 def identify_hotspot_loops(ast, threshold, filter_fn=outermost_filter, debug=False):
     profiler = LoopTimeProfiler(ast)
     profiler.run(debug=debug,filter_fn=filter_fn)
-    profile = profiler.data
-    app_time = profile['main_fn']
-    profile.pop('main_fn')
-    min_hotspot_time = app_time*threshold
-    hotspot_candidates = []
-    for loop in profile:
-        if profile[loop] > min_hotspot_time:
-            hotspot_candidates.append((loop, profile[loop]))
+    print(profiler.data)
+    app_time = profiler.data['main_fn']
+    profiler.data.pop('main_fn')
+    hotspot_candidates = [(loop,time) for (loop,time) in profiler.data.items() if time > app_time*threshold]
     hotspot_candidates.sort(key=lambda l: l[1], reverse=True)
     return hotspot_candidates
 
@@ -23,42 +19,34 @@ def inline_functions_with_pointer_args(ast, fn):
     to_inline = []
     calls = fn.query('c{CallExpr}')
     for row in calls:
-        # TODO: operator calls are caught here - handle 
         if "operator=" in row.c.name:
-            continue
+            continue  # operator calls are caught here, ignore 
         for arg in row.c.args:
-            pointer_args = arg.query('r{DeclRefExpr}', where=lambda r: pointer_type(r.type))
-            if pointer_args:
-                to_inline.append(row.c)
+            if arg.query('r{DeclRefExpr}', where=lambda r: pointer_type(r.type)):
+                to_inline.append(row.c) # if call has any pointer args, inline
                 break
     for call in to_inline:
         inline_fn(ast, fn, call)
 
 def analyse_tripcounts(ast, fn_name, debug=False, exec_rule=''):
-    # statically check if any tripcounts are fixed
-    # TODO: currently assumes simple loop incremement condition (idx++/idx--)
     fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == fn_name)[0].fn
     loops = fn.query(select="(loop{ForStmt})")
+    # statically check if any tripcounts are fixed
     fixed_bound_loops = []
     for row in loops:
         info = get_loop_info(row.loop)
+        # TODO: currently assumes simple loop incremement condition (idx++/idx--)
         if info['start'].isdigit() and info['end'].isdigit():
             fixed_bound_loops.append(row.loop.tag)
     # dynamically analyse tripcounts 
     profiler = LoopTripCountProfiler(ast, fn_name)
-    data = profiler.run(debug=debug, exec_rule=exec_rule)
-    # parse profiler results
-    tripcounts = {}
-    for tag in data:
-        tripcounts[tag] = {}
-        tripcounts[tag]['total'] = data[tag]['total']
-        tripcounts[tag]['instances'] = data[tag]['instances']
-        tripcounts[tag]['average'] = int(data[tag]['total']/data[tag]['instances'])
+    profiler.run(debug=debug, exec_rule=exec_rule)
+    # add static info to profiler results
+    for tag in profiler.data:
+        profiler.data[tag]['fixed'] = False
         if tag in fixed_bound_loops:
-            tripcounts[tag]['fixed'] = True
-        else:
-            tripcounts[tag]['fixed'] = False
-    return tripcounts
+            profiler.data[tag]['fixed'] = True   
+    return profiler.data
 
 def run_data_inout_analysis(ast, fn_name, debug=False, exec_rule=''):
     profiler = DataInOutProfiler(ast)
@@ -94,8 +82,7 @@ def count_flops_basecase(scope, tripcounts, fn_flop_map):
         if fn_name not in fn_flop_map:
             fn = scope.ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == fn_name)
             if fn:
-                fn_count = count_flops(fn[0].fn.body, 0, tripcounts, fn_flop_map)
-                fn_flop_map[fn_name] = fn_count
+                fn_flop_map[fn_name] = count_flops(fn[0].fn.body, 0, tripcounts, fn_flop_map)
             else:
                 print("Can't count flops for %s, can't find function decl." % fn_name)
                 continue
@@ -136,11 +123,8 @@ def analyse_loop_dependencies(ast, fn_name):
         reads, writes, schedule = build_polyhedral_model(row.l)
         if not schedule:
             return
-        loop_deps[row.l.tag] = {}
         raw_deps, war_deps, waw_deps = analyse_loop_deps(reads, writes, schedule)
-        loop_deps[row.l.tag]['raw'] = raw_deps
-        loop_deps[row.l.tag]['war'] = war_deps
-        loop_deps[row.l.tag]['waw'] = waw_deps
+        loop_deps[row.l.tag] = {'raw': raw_deps, 'war': war_deps, 'waw': waw_deps} 
         loop_deps[row.l.tag]['parallel'] = is_loop_parallel(raw_deps, war_deps, waw_deps,get_loop_info(row.l)['idx'])
         if not writes or not reads:
             loop_deps[row.l.tag]['parallel'] = True    
@@ -203,7 +187,6 @@ def use_sp_math_functions(ast, fns):
         ast.commit()
         calls = ast.query('fn{FunctionDecl} => c{CallExpr}', where=lambda c,fn: c.name in math_funcs and fn.name in fns)
 
-
 def use_sp_fp_literals(ast, fns):
     funcs = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name in fns)
     for row in funcs:
@@ -214,6 +197,7 @@ def use_sp_fp_literals(ast, fns):
         int_literals = func.body.query("il{IntegerLiteral}", where=lambda il: il.parent.type.spelling == 'float' or il.parent.type.spelling == 'double')
         for row in int_literals:
             row.il.instrument(Action.replace, code=f"{row.il.unparse()}.0f")
+
 
 def add_parameter(params, ref):
     params.append({'name': ref.name, 'type': ref.type.spelling})
@@ -238,9 +222,7 @@ def refine_parameter_list(loop, fn, params):
         declared_in_fn = fn.body.encloses(decl)
         init = None
         if declared_in_fn:
-            # find init
             init = [row.ref.parent for row in decl_refs if (not loop.encloses(row.ref) and row.ref.parent.isentity('BinaryOperator') and row.ref.parent.symbol == '=')]
-            print([r.unparse() for r in init])
         if init:
             init = init[0]
         used_outside_loop = any([not row.ref.parent == init and not loop.encloses(row.ref) for row in decl_refs])
@@ -293,50 +275,3 @@ def extract_loop_to_function(ast, ltag, new_fn_name='__loop_fn__'):
     call_args_string = ", ".join([p['name'] for p in params] + pointer_size_args)
     new_func_call = "%s(%s);" % (new_fn_name,call_args_string)
     loop.instrument(Action.replace, code=new_func_call)
-
-def openmp_multithread_loops(ast, scope):
-    parallel_loops = scope.query('loop{ForStmt}', where=lambda loop: loop.is_outermost() and parallel_filter(loop))
-    srcs = []
-    for row in parallel_loops:
-        # instrument loop with pragma omp parallel for num_threads(NUM_THREADS)
-        row.loop.instrument(Action.before, code="#pragma omp parallel for num_threads(NUM_THREADS)\n")
-        srcs.append(row.loop.module)
-    # instrument src with #include <omp> and #define NUM_THREADS 8
-    srcs = list(set(srcs))
-    for src in srcs:
-        src.module.instrument(Action.before, code="#include <omp.h>\n#define NUM_THREADS 8\n")
-    ast.commit()
-
-def run_openmp_num_threads_DSE(ast, max_threads):
-    best = n = 2
-    min_time = 100000000000
-    while n <= max_threads:
-        set_num_threads_omp(ast, n)
-        ast.sync(commit=True)
-        times = []
-        for i in range(0,3): # 3 runs for each n threads
-            profiler = LoopTimeProfiler(ast)
-            profiler.run(debug=True,filter_fn=omp_parallel_loop_filter, exec_rule='run_omp')
-            del profiler.data['main_fn']
-            times.append(sum(list(profiler.data.values())))
-        if np.mean(times) < min_time:
-            min_time = np.mean(times)
-            best = n
-        n *= 2
-    set_num_threads_omp(ast, best)
-    ast.sync(commit=True)  
-
-def set_threads_to(pragma):
-    if pragma[0:4] == "omp parallel for num_threads":
-        return "#pragma omp parallel for num_threads(NUM_THREADS)"
-    return True
-
-def set_num_threads_omp(ast, n):
-    ast.parse_pragmas()
-    def_stmt = ast.query('d{MacroDefinition}', where=lambda d: 'NUM_THREADS' in d.unparse())
-    if not def_stmt:
-        ast.sources[0].module.instrument(Action.before, code=f"#define NUM_THREADS {n}")
-    else:
-        def_stmt[0].d.instrument(Action.replace, code=f"NUM_THREADS {n}")
-    ast.sources[0].module.instrument(Action.pragmas, fn=set_threads_to)
-

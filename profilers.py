@@ -141,6 +141,8 @@ class LoopTripCountProfiler:
                     self.data[looptag]['total'] = count
                 elif '_invoc' in tag:
                     self.data[looptag]['instances'] = count
+            for tag in self.data:
+                self.data[tag]['average'] = int(self.data[tag]['total']/self.data[tag]['instances'])
 
         self.ast.exec(report=report, rule=exec_rule)
 

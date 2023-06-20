@@ -1,10 +1,8 @@
 #!/usr/bin/env artisan
-
 from meta_cl import *
 import json
 import islpy as isl
 import random
-
 
 def incl_artisan(src, mem_init=False):
     includes_artisan = src.query('inc{InclusionDirective}', where=lambda inc: inc.unparse() == "#include <meta_cl>")
@@ -16,16 +14,6 @@ def incl_artisan(src, mem_init=False):
             src.instrument(Action.before, code="#include <meta_cl>\nusing namespace meta_cl;\nMETA_CL_MEM_INIT\n")
         elif includes_artisan and not mem_init_macro:
             includes_artisan[0].inc.instrument(Action.after, code="META_CL_MEM_INIT\n")
-    else:
-        pass
-
-## LOOP TIME UTILITIES
-def should_ignore(loop):
-    if loop.pragmas:
-        for p in loop.pragmas:
-            if len(p[0]) > 2 and p[0][2] == 'ignore':
-                return True
-    return False
 
 def outermost_filter(loop):
     return loop.is_outermost()
@@ -40,9 +28,9 @@ def parallel_filter(loop):
 
 def parse_omp_parallel_loop_pragmas(pragma):
     if " ".join(pragma[0:3]) == "omp parallel for":
-        return "loop" # exclude pragma
+        return "loop" 
     else:
-        return False
+        return False # exclude pragma
 
 def omp_parallel_loop_filter(loop):
     return loop.pragmas is not None and any([p[0] for p in loop.pragmas if len(p[0]) > 3 and " ".join(p[0][0:3]) == "omp parallel for"])
@@ -91,7 +79,6 @@ def build_points_to_map(pointer_ranges):
                 alias_map[p1].append(p2)
     return alias_map
 
-
 def is_reachable(n1, n2, adj_map):
     # bfs approach to check if there is a path between two nodes
     visited = []
@@ -119,60 +106,45 @@ def pointer_type(t):
 def array_type(t):
     return str(t.kind) == "TypeKind.CONSTANTARRAY"   
 
-def read_or_write_param(param, fn):
+def read_or_write_param(param, fn): # determine if a fn param is read or write or both 
     refs = fn.query("ref{DeclRefExpr}", where=lambda ref: ref.name == param.name)
-    reads = any([row.ref.access.is_used for row in refs])
-    writes = any([row.ref.access.is_def for row in refs])
-    if reads and writes:
-        return 'RW'
-    elif reads:
-        return 'R'
-    elif writes:
-        return 'W'
-    else: 
-        # shouldnt reach
-        return 'RW'
+    rw =  ""
+    if any([row.ref.access.is_used for row in refs]):
+        rw += 'R'
+    if any([row.ref.access.is_def for row in refs]):
+        rw += 'W'
+    return rw
 
-# determine if a variable reference is reading or writing or both
-def read_or_write(ref):
-    if ref.access.is_used and ref.access.is_def:
-        return 'RW'
-    elif ref.access.is_used:
-        return 'R'
-    elif ref.access.is_def:
-        return 'W'
-    else:
-        # shouldn't reach 
-        return 'R'
-
+def read_or_write(ref): # determine if a variable reference is reading or writing or both
+    rw = ""
+    if ref.access.is_used:
+        rw += 'R'
+    if ref.access.is_def:
+        rw += 'W'
+    return rw
 
 def inline_fn(ast, scope, call, fn=None):
     if not fn:
         fn = ast.query("fn{FunctionDecl}", where=lambda fn: fn.name == call.name and fn.body)
-    if not fn:
-        # print("Function not locally defined, cannot inline: %s" % call.name)
-        return None
+    if not fn: # function not locally defined, cannot inline
+        return 
     fn = fn[0].fn
-    fn_params = fn.signature.params
-    call_args = call.args
+    fn_params, call_args = fn.signature.params, call.args
     inlined_code = ""
     ret = fn.query("r{ReturnStmt}")
-
     # initialise func params as call args
     # note: assumes no pointer args are derived (e.g. f(a+10) or f(&a[10]) where a is a pointer)
     for i in range(len(fn_params)):
-        param_type = fn_params[i][0]
-        param_name = fn_params[i][1]
+        param_type,  param_name = fn_params[i][0], fn_params[i][1] 
         arg = call_args[i].unparse()
         if arg != param_name:
             cast = ""
             if pointer_type(param_type):
                 cast = "(%s)"%param_type.spelling
             inlined_code += "%s %s = %s%s;\n" % (param_type.spelling,param_name,cast,arg)
-        
     # insert func body 
     inlined_code += fn.body.unparse()[1:-1]
-    
+    # instrument to replace call with inlined  fn 
     if ret:
         ret_stmt = ret[0].r.unparse().strip()
         inlined_code = inlined_code.replace(ret_stmt, "") # remove return stmt from inline
@@ -188,19 +160,7 @@ def pragma_to_dict(pragma):
         return {}
     return json.loads(''.join(pragma[0][3:]))
 
-def artisan_pragmas(pragma):
-    if pragma [0] == "artisan":
-        if pragma[1] == "loop":
-            return "loop" # this is the entity we wish to associate to
-        elif pragma[1] == "fn":
-            return "FunctionDecl"
-        else:
-            return False # exclude pragma
-
-
-## NEED TO REVIEW BELOW 
-
-#TODO: NOT ROBUST (could be symbols)
+# TODO: make robust to symbols 
 def try_eval(expr):
     try:
         return eval(expr)
@@ -221,7 +181,7 @@ def get_loop_info(loop):
     end = loop.condition.children[1].unparse()
     return {'idx': idx, 'start': str(try_eval(start)), 'end': str(try_eval(end))}
 
-## MEMORY UTILITIES
+
 def register_dynamic_pointer_sizes(ast, scopes_to_ignore=[]):
     # TODO: currently no support for 'realloc'
     # allocations with malloc
@@ -233,7 +193,6 @@ def register_dynamic_pointer_sizes(ast, scopes_to_ignore=[]):
             continue
         row.bop.instrument(Action.after, code=";\nMem::reg(%s, %s);\n" % (decl_ref.name, malloc_call.args[0].unparse()))
         row.bop.instrument(Action.remove_semicolon, verify=False)
-
     # allocations with calloc
     results = ast.query('bop{BinaryOperator} => c{CallExpr}', where=lambda c: c.name == 'calloc')
     results = [row for row in results if not any([scope.encloses(row.c) for scope in scopes_to_ignore])]
@@ -242,13 +201,11 @@ def register_dynamic_pointer_sizes(ast, scopes_to_ignore=[]):
         decl_ref = row.bop.children[0]
         if not decl_ref.isentity('DeclRefExpr'):
             continue
-        # TODO: fix this -- calloc_call.args not catching first arg
+        # TODO: calloc_call.args does not catch first arg
         args = calloc_call.unparse().replace("calloc(", "")[:-1].split(",")
         size_str = args[0] + "*"+ args[1]
-        # size_str = calloc_call.args[0].unparse() + "*"+ calloc_call.args[1].unparse()
         row.bop.instrument(Action.after, code=";\nMem::reg(%s, %s);\n" % (decl_ref.name, size_str))
         row.bop.instrument(Action.remove_semicolon, verify=False)
-
     # allocations with 'new'
     results = ast.query('new{CxxNewExpr}')
     results = [row for row in results if not any([scope.encloses(row.new) for scope in scopes_to_ignore])]
@@ -257,11 +214,9 @@ def register_dynamic_pointer_sizes(ast, scopes_to_ignore=[]):
         num_els = code[code.index('[')+1:code.index(']')]
         ptype = row.new.type.spelling.replace("*", "").strip()
         size_str = "%s*sizeof(%s)" % (num_els, ptype)
-        # T * a = new ...
-        if row.new.parent.isentity('VarDecl'):
+        if row.new.parent.isentity('VarDecl'): # T * a = new ...
             name = row.new.parent.name
-        # a = new ... 
-        elif row.new.parent.isentity('BinaryOperator'):
+        elif row.new.parent.isentity('BinaryOperator'): # a = new ... 
             name = row.new.parent.children[0].name
         else:
             # TODO: are there any other cases to cover?
@@ -282,28 +237,19 @@ def trace_memory(ast, scopes_to_ignore=[]):
     if not results:
         return
     main_src = results[0].src
-
     # instrument with include and ARTISAN MEM INIT
     incl_artisan(main_src, mem_init=True)
-    # main_src.instrument(Action.before, code="#include <meta_cl>\nusing namespace meta_cl;\nMETA_CL_MEM_INIT\n")
-
     other_srcs = ast.query(select="src{Module}", where=lambda src: src.tag != main_src.tag)
     for res in other_srcs:
         incl_artisan(res.src)
-        # res.src.instrument(Action.before, code="#include <meta_cl>\nusing namespace meta_cl;\n")
-
     # find all dynamic pointer allocations in application, instrument to register
     register_dynamic_pointer_sizes(ast, scopes_to_ignore=scopes_to_ignore)
-
     # instrument static pointer allocations to register size 
     register_static_array_sizes(ast, scopes_to_ignore=scopes_to_ignore) 
 
-    # ast.commit()
+# Polyhedral Analysis Helpers
 
-
-##POLYHEDRAL
-
-## TODO: need to check more cases, see if this generalisation can work 
+# TODO: check more cases, see if this generalisation can work 
 def dep_map_handler(m, deps):
     d = m.domain()
     r = m.range()
@@ -320,13 +266,12 @@ def dep_map_handler(m, deps):
                 dist = int(str(coefs[i]))
             else:
                 var = i
-                # TODO: check for more complex deps 
         dep['dists'].append((var, dist))
     if not sink in deps:
         deps[sink] = []
     deps[sink].append(dep)
 
-#TODO: if there are multiple deps in one stmt, match var to dep
+#  TODO: if there are multiple deps in one stmt, match var to dep
 def sink_map_handler(m, vars):
     stmt = m.domain().get_tuple_name()
     var = m.range().get_tuple_name()
@@ -455,13 +400,18 @@ def array_access_relation(stmt_instance_id, ref, stmt_domain, arr_constraint, sy
         var = r.ref.unparse()
         if var not in domain_vars:
             #TODO: HACK TO HANDLE SYMBOLS / EXPRESSIONS IN BEZIER BLEND
-            if var == 'in_size' or var == 'out_size': 
-                if var not in symbol_map:
-                    symbol_map[var] = str(random.randint(1,10))
+            # print(var,'--', idx, '--', domain_vars)
+            # print(symbol_map)
+            # if var == 'out_size': 
+            if var in symbol_map:
+                # print("doing  things")
+                # if var not in symbol_map:
+                #     symbol_map[var] = str(random.randint(1,10))
                 idx = idx.replace(var, symbol_map[var])
             else:
                 to_check.append(var)
     symbols = check_symbolic_vars(to_check)
+    # print(symbols)
     arr = ref.unparse()
     idx = eval_const_exprs(idx)
     return isl.Map("%s{%s->%s[_i_]: _i_=%s}" % (symbols,stmt_instance_id, arr, idx)).intersect_domain(stmt_domain).intersect_range(arr_constraint)
@@ -482,12 +432,11 @@ def add_array_constraint(ref, array_constraints):
     symbols = check_symbolic_vars([st,end])
     array_constraints[arr] = isl.Set("%s{%s[_i_]: %s<=_i_<%s}" % (symbols,arr,st,end))
 
-def determine_access_relations(stmt_info, stmt_instance_ids, stmt_it_domains, local_vars):
+def determine_access_relations(stmt_info, stmt_instance_ids, stmt_it_domains, local_vars, symbol_map):
     reads = {}
     writes = {}
     array_constraints = {}
     cnt = 0 # counter so multiple accesses to same var in same stmt can be differentiated
-    symbol_map = {}
     for id in stmt_info:
         accesses = stmt_info[id]['var_refs']
         for row in accesses:
@@ -507,22 +456,21 @@ def determine_access_relations(stmt_info, stmt_instance_ids, stmt_it_domains, lo
             cnt += 1
     return reads, writes
 
-def determine_iteration_domains_and_schedule(stmt_info, stmt_instance_ids):
+def determine_iteration_domains_and_schedule(stmt_info, stmt_instance_ids, symbol_map):
     stmt_iteration_domains = {}
     stmt_schedules = {}
-
     global_sched_len = 2*max([len(stmt['loops']) for stmt in stmt_info.values()])
     sched_start = "[%s]" % ','.join(['t'+str(i) for i in range(0,global_sched_len)])
-
     for id in stmt_info:
         loops = stmt_info[id]['loops']
         # iteration domain
         domain_ranges = []
         to_check = []
         for i in loops:
-            ##TODO: FIX ISSUE  FOR BEZIER BLEND 
-            if i['end'] == 'in_size + 1':
-                i['end'] = '21'
+            if i['end'] in symbol_map:
+                i['end'] = symbol_map[i['end']]
+            if i['start'] in symbol_map:
+                i['start'] = symbol_map[i['start']]
             domain_ranges.append(i['start'] + "<=" + i['idx'] + "<" + i['end'])
             to_check.append(i['start'])
             to_check.append(i['end'])
@@ -534,7 +482,6 @@ def determine_iteration_domains_and_schedule(stmt_info, stmt_instance_ids):
             sched += [loops[i]['idx']] + [stmt_info[id]['order'][i]]
         sched += [0]*(global_sched_len-len(sched))
         stmt_schedules[id] = isl.Map("{%s->%s: %s}" % (stmt_instance_ids[id], sched_start, ' and '.join(['t'+str(i)+'='+str(sched[i]) for i in range(0,global_sched_len)])))
-    
     return stmt_iteration_domains, stmt_schedules
 
 def generate_isl_unionmap(maps, debug=False):
@@ -546,31 +493,30 @@ def generate_isl_unionmap(maps, debug=False):
         unionmap = unionmap.union(m)
     return unionmap
 
-def build_polyhedral_model(loop, debug=False):
+def build_fixed_symbol_map(loop):
+    results = loop.query('a{ArraySubscriptExpr} => ref{DeclRefExpr}')
+    fixed_symbol_map = {}
+    done = []
+    for row in results:
+        if row.ref.name not in done and row.ref.parent != row.a and not (row.ref.decl.parent.isentity('DeclStmt') and row.ref.decl.parent.parent.isentity('ForStmt')):
+            refs_in_loop = loop.query('ref{DeclRefExpr}', where=lambda ref: ref.name == row.ref.name)
+            if not any([read_or_write(i.ref) != 'R' for i in refs_in_loop]): # read only, not modified in loop
+                fixed_symbol_map[row.ref.name] = str(random.randint(1,10))
+        done.append(row.ref.name)
+    return fixed_symbol_map
 
+def build_polyhedral_model(loop, debug=False):
     local_vars = [v.name for v in get_local_var_list(loop)]
     stmt_info = process_stmts(loop)
+    fixed_symbol_map = build_fixed_symbol_map(loop)
     if not stmt_info:
         return None, None, None
     try:
         stmt_instance_ids = generate_stmt_instance_identifiers(stmt_info)
-        stmt_iteration_domains, stmt_schedules = determine_iteration_domains_and_schedule(stmt_info, stmt_instance_ids)
-        reads, writes = determine_access_relations(stmt_info, stmt_instance_ids, stmt_iteration_domains, local_vars)
-    except:
-        # print("Unable to build polyhedral model.")
+        stmt_iteration_domains, stmt_schedules = determine_iteration_domains_and_schedule(stmt_info, stmt_instance_ids, fixed_symbol_map)
+        reads, writes = determine_access_relations(stmt_info, stmt_instance_ids, stmt_iteration_domains, local_vars, fixed_symbol_map)
+    except: # unable to build polyhedral model
         return None, None, None
-    if debug:
-        print("\nStatement instance identifiers:")
-        pp.pprint(stmt_instance_ids, indent=2)
-        print("\nIteration domains:")
-        pp.pprint(stmt_iteration_domains, indent=2)
-        print("\nSchedule:")
-        pp.pprint(stmt_schedules, indent=2)
-        print("\nRead access relations:")
-        pp.pprint(reads, indent=2)
-        print("\nWrite access relations:")
-        pp.pprint(writes, indent=2)
-
     schedule = generate_isl_unionmap(stmt_schedules)
     reads = generate_isl_unionmap(reads, debug=True)
     writes = generate_isl_unionmap(writes)
@@ -579,19 +525,7 @@ def build_polyhedral_model(loop, debug=False):
 def is_parallel(reads, writes, schedule, idx_var, debug=False):
     if not schedule:
         return None
-    if not writes:
-        return True
-    if not reads:
+    if not writes or not reads:
         return True
     raw_deps, war_deps, waw_deps = analyse_loop_deps(reads, writes, schedule, debug=debug)
     return is_loop_parallel(raw_deps, war_deps, waw_deps, idx_var)
-
-
-def check_loop(loop, idx_var, debug=False):
-    reads, writes, schedule = build_polyhedral_model(loop, debug=debug)
-    parallel = is_parallel(reads,writes,schedule,idx_var,debug=debug)
-
-
-def report_deps(loop, debug=True):
-    reads, writes, schedule = build_polyhedral_model(loop, debug=debug)
-    analyse_loop_deps(reads,writes,schedule, debug=debug)
