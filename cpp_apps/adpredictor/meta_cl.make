@@ -42,7 +42,7 @@ s10_report: s10_report.a
 dev_s10.o: $(SOURCES)
 	dpcpp  $(CXXFLAGS)  -fintelfpga -c $^ -o $@ -DFPGA=1
 s10_report.a: dev_s10.o
-	dpcpp  $(CXXFLAGS)  -fintelfpga -fsycl-link $^ -o $@ -Xshardware -Xsboard=/opt/intel/oneapi/intel_s10sx_pac:pac_s10_usm
+	dpcpp  $(CXXFLAGS)  -fintelfpga -fsycl-link $^ -o $@ -Xshardware -Xsboard=/workspace/intel_s10sx_pac:pac_s10_usm
 
 clean:
 	rm -f $(EXE_NAME)

@@ -11,7 +11,6 @@ def add_scope(node):
 
 def scopify(ast):
     # scopify loops
-    wave = 1
     while True:
         table = ast.query("forloop{ForStmt}", 
                     where=lambda forloop: not forloop.body.isentity("CompoundStmt"))
@@ -21,12 +20,11 @@ def scopify(ast):
         for row in disjoint_table:
             add_scope(row.forloop.body)
         ast.commit()
-        wave += 1
     # scopify conditionals
-    wave = 1
     while True:
         table = ast.query("ifstmt{IfStmt}", 
-                    where=lambda ifstmt: not ifstmt.body.isentity("CompoundStmt") or (ifstmt.elsebody and not ifstmt.elsebody.isentity("CompoundStmt")))
+                    where=lambda ifstmt: (not ifstmt.body.isentity("CompoundStmt") 
+                            or (ifstmt.elsebody and not ifstmt.elsebody.isentity("CompoundStmt"))))
         if not table:
             break
         disjoint_table = table.apply(RSet.disjoint, target='ifstmt')
@@ -36,7 +34,6 @@ def scopify(ast):
             elif not row.ifstmt.elsebody.isentity("CompoundStmt"):
                 add_scope(row.ifstmt.elsebody)
         ast.commit()
-        wave += 1
 
 def separate_vardecl_and_init(ast):
     result = ast.query('ds{DeclStmt} ={1}> vd{VarDecl}', 
@@ -65,7 +62,7 @@ def find_scope(node):
 def normalise_pointer_dereferences(ast):
     results = ast.query('uop{UnaryOperator} ={1}> p{ParenExpr}', where=lambda uop: uop.symbol == '*')
     for row in results:
-        ## ASSUMES FORMAT: *(POINTER + exp...)
+        ## assumes format: *(POINTER + exp...)
         refs = row.p.query('ref{DeclRefExpr}', where=lambda ref: pointer_type(ref.type))
         if len(refs) != 1:
             print("Cannot normalise pointer dereference at %s, exiting." % row.uop.location)
@@ -83,4 +80,3 @@ def inline_fns_with_loops(ast):
             continue
         inline_fn(ast,fn[0].fn, call)
     ast.sync(commit=True)
-

@@ -90,7 +90,7 @@ def generate_oneapi_design(ast, data, *args):
     map_to_oneapi_basic(ast, kernel_fn, data['pointer_alias_report']['restrict'], kernel_fn.name)
     ast.sync(commit=True)
 
-def use_oneapi_zerocopy_memory(ast,dat,*args):
+def use_oneapi_zerocopy_memory(ast,data,*args):
     kernel_fn = ast.query('fn{FunctionDecl}', where=lambda fn: fn.name == data['hotspot_fn_name'])[0].fn
     basic_kernel_to_zerocopy(ast,kernel_fn)
     ast.sync(commit=True)

@@ -399,19 +399,11 @@ def array_access_relation(stmt_instance_id, ref, stmt_domain, arr_constraint, sy
     for r in refs_in_idx:
         var = r.ref.unparse()
         if var not in domain_vars:
-            #TODO: HACK TO HANDLE SYMBOLS / EXPRESSIONS IN BEZIER BLEND
-            # print(var,'--', idx, '--', domain_vars)
-            # print(symbol_map)
-            # if var == 'out_size': 
             if var in symbol_map:
-                # print("doing  things")
-                # if var not in symbol_map:
-                #     symbol_map[var] = str(random.randint(1,10))
                 idx = idx.replace(var, symbol_map[var])
             else:
                 to_check.append(var)
     symbols = check_symbolic_vars(to_check)
-    # print(symbols)
     arr = ref.unparse()
     idx = eval_const_exprs(idx)
     return isl.Map("%s{%s->%s[_i_]: _i_=%s}" % (symbols,stmt_instance_id, arr, idx)).intersect_domain(stmt_domain).intersect_range(arr_constraint)

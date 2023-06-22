@@ -5,7 +5,7 @@ import numpy as np
 import os 
 
 def get_kernel_signature(fn, restrict):
-     # TODO: currently checks that all pointers are alias free,
+     # currently checks that all pointers are alias free,
      # could check individually for aliasing
     params = fn.signature.params
     new_params = []
@@ -24,39 +24,30 @@ def get_kernel_signature(fn, restrict):
 def next_multiple(a, b):
     return (a + b - 1) // b * b
 
-# TODO: 1D for now, gid = threadIdx.x
+# only supports 1D for now, gid = threadIdx.x
 def generate_hip_kernel(ast, fn, restrict):
-
     # __global__ kernel signature with restricted pointers if applicable
     kernel_signature = get_kernel_signature(fn,restrict)
-    
     # check helper functions -- add __device__ __host__
     called_fns = get_called_fns(ast, fn)
     for f in called_fns:
         name = f[0]
         decl = f[1]
         decl.instrument(Action.before, code="__device__ __host__ ")
-
     loop = fn.query('l{loop}', where=lambda l: l.is_outermost())[0].l
     problem_size = get_loop_info(loop)['end']
-
     # remove outer loop, set loop idx var to global id (threadIdx.x)
     gid_varinit = "unsigned %s = blockDim.x*blockIdx.x+threadIdx.x;;" % get_loop_info(loop)['idx']   
-    
     # check that global id is within problem size bounds 
     bounds_check = "if (%s >= %s) return;" % (get_loop_info(loop)['idx'] , problem_size)
-    
     # generate kernel function string
     kernel_body = "%s\n%s\n%s" % (gid_varinit, bounds_check, loop.body.unparse()[1:-1])
     kernel_fn  = "%s {\n%s\n}" % (kernel_signature, kernel_body)
-    
     return problem_size, kernel_fn
 
 def map_to_hip_gpu(ast, fn, restrict=False):
-
     # add relevant includes
     fn.module.instrument(Action.before, code="#include \"hip/hip_runtime.h\"\n")
-
     # create and hipmalloc gpu pointers, hipmemcpy read only vars from host to device,
     # hipmemcpy write only vars from device to host, hipFree new pointers
     pointers = [] 
@@ -69,7 +60,6 @@ def map_to_hip_gpu(ast, fn, restrict=False):
     wrapper_fn_memcpy_tohost = ""
     hipmalloc_template = "hipMalloc((void**)&%s, %s);\n"
     memcpy_template = "hipMemcpy(%s, %s, %s, %s);\n"
-    
     args = []
     for row in params:
         param = row.p
@@ -91,38 +81,30 @@ def map_to_hip_gpu(ast, fn, restrict=False):
             args.append(param.name + "_gpu")
         else:
             args.append(param.name)
-
     # transform function to __global__ HIP kernel
     problem_size, kernel_fn = generate_hip_kernel(ast, fn, restrict)
-
     # insert code to print device information
     device_check = "hipDeviceProp_t prop;\nhipGetDeviceProperties(&prop, 0);\nprintf(\"\\nDevice: %s\\n\", prop.name);\n"
     # launch kernel (need problem size, block size, kernel args)
     launch_template = "size_t dyn_shared = 0;\nhipLaunchKernelGGL(%s, dim3(%s/_blocksize_), dim3(_blocksize_), dyn_shared, 0, %s);\n"
     launch_string = launch_template % (fn.name, "next_multiple(%s, _blocksize_)" % problem_size, ', '.join(args))
-
-
     blocksize = "const int _blocksize_ = 256;\n"
     next_multiple_string = "unsigned long int next_multiple(int a, int b) { return (unsigned long)((a + b - 1) / b * b); }\n"
-    
     # if kernel call is inside a loop -- extract outer loop to wrapper function 
     called_in_loop = ast.query('fn{FunctionDecl} => loop{ForStmt} => call{CallExpr}', where=lambda call: call.name == fn.name)
     if len(called_in_loop) > 0:
         loop = called_in_loop[0].loop
         extract_loop_to_function(ast, loop.tag, new_fn_name=f"{fn.name}_wrapper_")
         ast.commit()
-
         # instrument new wrapper function with all hipmalloc / hipmemcpy / hipfree code 
         wrapper_fn = ast.query('w_fn{FunctionDecl}', where=lambda w_fn: w_fn.name == f"{fn.name}_wrapper_")[0].w_fn         
         wrapper_fn.instrument(Action.before, code=f"{next_multiple_string}\n") #{blocksize}\n")
         wrapper_fn.instrument(Action.begin, code=f"{device_check}\n{blocksize}\n{wrapper_fn_pointer_decls}\n{wrapper_fn_hipmalloc}\n{wrapper_fn_memcpy_todevice}\n")
         wrapper_fn.instrument(Action.end, code=f"{wrapper_fn_memcpy_tohost}\n{wrapper_fn_hipfree}\n")
         ast.commit()
-
         # replace existing kernel function with global version
         kernel = ast.query('kfn{FunctionDecl}', where=lambda kfn: kfn.name == fn.name)[0].kfn 
         kernel.instrument(Action.replace, code=f"{kernel_fn}\n")
-
         # replace call to kernel with launch string 
         kernel_call = ast.query('w_fn{FunctionDecl} => call{CallExpr}', where=lambda w_fn, call: w_fn.name == f"{fn.name}_wrapper_" and call.name == fn.name)[0].call
         kernel_call.instrument(Action.replace, code=launch_string)
@@ -138,7 +120,6 @@ def map_to_hip_gpu(ast, fn, restrict=False):
         calls = ast.query('c{CallExpr}', where=lambda c: c.name == fn.name)
         for row in calls:
             row.c.instrument(Action.replace, code=row.c.unparse().replace(fn.name, fn.name+"_wrapper_"))
- 
     ast.commit()
     return
 
@@ -166,7 +147,6 @@ def use_pinned_memory(ast):
         assignment.instrument(Action.replace, code=f"hipHostMalloc((void**)&{pointer_var}, {size});")
         assignment.instrument(Action.remove_semicolon, verify=False)
         pinned_pointers.append(pointer_var)
-
     frees = ast.query('c{CallExpr}', where=lambda c: c.name == 'free')
     for row in frees:
         pointer_var = row.c.args[0].unparse()
@@ -174,13 +154,11 @@ def use_pinned_memory(ast):
             row.c.instrument(Action.replace, code=f"hipFree({pointer_var});")
             row.c.instrument(Action.remove_semicolon, verify=False)
 
-
 def introduce_shared_mem_buf_hip(kernel, kernel_wrapper, pointer_param, struct_map):
     # get pointer size and type
     pointer_var = pointer_param[1]
     pointer_type = pointer_param[0].spelling.replace("*", "").replace(" ", "").replace("__restrict", "")
     pointer_size = f"({pointer_var}_size_/sizeof({pointer_type}))" 
-    
     # set dynamic shared memory size
     vds = kernel_wrapper.query('vd{VarDecl}', where=lambda vd: vd.name == 'dyn_shared')
     for row in vds:
@@ -188,7 +166,6 @@ def introduce_shared_mem_buf_hip(kernel, kernel_wrapper, pointer_param, struct_m
         new_string = decl_string[:decl_string.index('=')+1] + f" {pointer_size}*sizeof({pointer_type});"
         row.vd.instrument(Action.replace, code=new_string)
         row.vd.instrument(Action.remove_semicolon, verify=False)
-
     # generate buffer fill loop string
     if pointer_type in struct_map:
         fill_string = ""
@@ -200,7 +177,6 @@ def introduce_shared_mem_buf_hip(kernel, kernel_wrapper, pointer_param, struct_m
                 f"for (int __idx__ = threadIdx.x; __idx__ < {pointer_size}; __idx__ += blockDim.x)" + "{ \n"
                 f"{fill_string}"
                 "}\n__syncthreads();")
-    
     # insert buffer fill loop string -- after condition check 
     bounds_check = kernel.query("cond{IfStmt} => ret{ReturnStmt}", where=lambda cond, ret: len(cond.children) == 2 and ret in cond.children)
     ## TODO: if multiple of these conditionals, find FIRST one (bounds check)
@@ -222,6 +198,47 @@ def introduce_shared_mem(ast, kernel_fn, wrapper_fn, report, struct_map, max_siz
         introduce_shared_mem_buf_hip(kernel_fn, wrapper_fn, kernel_param, struct_map)
         ast.commit()
     ast.sync(commit=True)
+
+def change_blocksize(ast, bs, bs_var="_blocksize_"):
+    decls = ast.query('vd{VarDecl}', where=lambda vd: vd.name == bs_var)
+    if not decls:
+       print(f"Can't find blocksize var decl for {bs_var}.")
+       return
+    decl = decls[0].vd
+    decl.instrument(Action.replace, code=f"const int {bs_var} = {bs}")
+
+def time_kernel_bs_DSE(hip_ast, kernel_fn, device=None):
+    all_times = {}
+    blocksize = 16
+    while blocksize <= 1024:
+        change_blocksize(hip_ast, blocksize)
+        hip_ast.sync(commit=True)
+        timer = HIPKernelTimer(hip_ast)
+        e2e_times, compute_times = timer.run(kernel_fn, num_runs=5, device=device)
+        print(f"Blocksize = {blocksize}\n", "E2E Times:", e2e_times, "Compute Times:", compute_times)
+        all_times[blocksize] = {}
+        all_times[blocksize]['e2e'] = e2e_times
+        all_times[blocksize]['compute'] = compute_times
+        blocksize *= 2
+    min_time = 1000000000000
+    best_bs = None
+    for bs in all_times:
+        ave = np.mean(all_times[bs]['e2e'])
+        print(f"Blocksize: {bs}, Average: {ave}")
+        if ave < min_time:
+            min_time = ave
+            best_bs = bs
+    min_time = 1000000000000
+    best_bs = None
+    for bs in all_times:
+        ave = np.mean(all_times[bs]['compute'])
+        print(f"Blocksize: {bs}, Average: {ave}\n ({all_times[bs]['compute']})")
+        if ave < min_time:
+            min_time = ave
+            best_bs = bs
+    change_blocksize(hip_ast, best_bs)
+    hip_ast.sync(commit=True)
+
 
 class HIPKernelTimer:
     def __init__(self, ast):
@@ -264,7 +281,6 @@ class HIPKernelTimer:
 
         # step 3: query main function
         results2 = self.ast.query("fn{FunctionDecl}", where=lambda fn: fn.name == 'main')
-
         for res in results2:
             res.fn.instrument(Action.begin,
                               code='Report::connect(); Report::write("["); int ret = [] (auto argc, auto argv) { ')
@@ -275,10 +291,8 @@ class HIPKernelTimer:
 
         # sync AST to execute
         self.ast.sync(commit=True)
-
         if device is not None:
-            os.environ['CUDA_VISIBLE_DEVICES'] = device # '0' == 2080, '2' == 1080 (ccgpu3)
-
+            os.environ['CUDA_VISIBLE_DEVICES'] = device
         # run
         def report(ast, data):
             self.data = data
@@ -299,53 +313,3 @@ class HIPKernelTimer:
             e2e_times.append(e2e_time)
 
         return e2e_times, compute_times
-
-
-def change_blocksize(ast, bs, bs_var="_blocksize_"):
-    decls = ast.query('vd{VarDecl}', where=lambda vd: vd.name == bs_var)
-    if not decls:
-       print(f"Can't find blocksize var decl for {bs_var}.")
-       return
-    decl = decls[0].vd
-    decl.instrument(Action.replace, code=f"const int {bs_var} = {bs}")
-
-def time_kernel_bs_DSE(hip_ast, kernel_fn, device=None):
-    all_times = {}
-    blocksize = 16
-    while blocksize <= 1024:
-        change_blocksize(hip_ast, blocksize)
-        hip_ast.sync(commit=True)
-        timer = HIPKernelTimer(hip_ast)
-        # timer.run(kernel_fn, num_runs=3)
-        e2e_times, compute_times = timer.run(kernel_fn, num_runs=5, device=device)
-        print(f"Blocksize = {blocksize}\n", "E2E Times:", e2e_times, "Compute Times:", compute_times)
-        all_times[blocksize] = {}
-        all_times[blocksize]['e2e'] = e2e_times
-        all_times[blocksize]['compute'] = compute_times
-        blocksize *= 2
-
-    print("E2E Times")
-    min_time = 1000000000000
-    best_bs = None
-    for bs in all_times:
-        ave = np.mean(all_times[bs]['e2e'])
-        print(f"Blocksize: {bs}, Average: {ave}")#\n ({all_times[bs]['e2e']})")
-        if ave < min_time:
-            min_time = ave
-            best_bs = bs
-    print(f"Best blocksize: {best_bs}")
-    
-    print("Compute Times")
-    min_time = 1000000000000
-    best_bs = None
-    for bs in all_times:
-        ave = np.mean(all_times[bs]['compute'])
-        print(f"Blocksize: {bs}, Average: {ave}\n ({all_times[bs]['compute']})")
-        if ave < min_time:
-            min_time = ave
-            best_bs = bs
-    print(f"Best blocksize: {best_bs}")
-    change_blocksize(hip_ast, best_bs)
-    hip_ast.sync(commit=True)
-
-
