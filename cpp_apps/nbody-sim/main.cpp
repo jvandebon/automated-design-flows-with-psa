@@ -1,12 +1,3 @@
-//*********************************************************************//
-// N-Body Simulation
-//
-// Author:  Maxeler Technologies
-//
-// Imperial College Summer School, July 2012
-//
-//*********************************************************************//
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

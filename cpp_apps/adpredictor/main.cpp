@@ -133,13 +133,9 @@ int main(int argc, char *argv[]) {
   const auto run_time0 = std::chrono::duration_cast<std::chrono::nanoseconds>(after0 - before0);
   double time0 = run_time0.count() / 1e9;
   printf("Input reading time: %.3gs\n", time0);
-
   db.close();
-
-
   std::cout << "Number of ad impressions: " << volume << "\n";
-// double total = 0;
-// for (int R = 0; R < 5; R++){
+  
   float *y = new float[volume];
   float *prior_m = new float[volume * NUM_FEATURES];
   float *prior_v = new float[volume * NUM_FEATURES];
@@ -174,7 +170,6 @@ int main(int argc, char *argv[]) {
   const auto run_time = std::chrono::duration_cast<std::chrono::nanoseconds>(after - before);
   double time = run_time.count()/1e9;  
   printf("CPU execution time: %.5gs\n", time);
-  // total += time;
 
   check_results(volume, post_m, post_s);
 
@@ -183,8 +178,7 @@ int main(int argc, char *argv[]) {
   delete[] post_m;
   delete[] post_s;
   delete[] y;
-// }
-// printf("Ave time: %.5gs\n", total/5.0);
+
   return 0;
 }
 

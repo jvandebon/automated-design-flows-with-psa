@@ -728,10 +728,6 @@ int main(int argc, char *argv[])
   parameters = (double*) malloc(parameters_size);
   init_parameters_values(parameters, num_nodes);
 
-  // double *t;
-  // t = (double *)malloc(1);
-  // t[0] = t_start;
-
   struct timespec timestamp_start, timestamp_now;
   double time_elapsed;
 

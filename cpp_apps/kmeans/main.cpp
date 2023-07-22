@@ -8,8 +8,6 @@ int main(int argc, char **argv) {
 
 	int points = atoi(argv[1]);
 	srand(100);
-	// double total_time__ = 0;
-	// for (int run = 0; run < 5; run++) {
 
 	float *classes = (float *)malloc(DIM*CLASSES*sizeof(float));
 	float *data = (float *)malloc(points*DIM*sizeof(float));
@@ -44,7 +42,6 @@ int main(int argc, char **argv) {
     auto run_time = std::chrono::duration_cast<std::chrono::nanoseconds>(after - before);
     double time = run_time.count() / 1e9;
     printf("Execution time: %.6gs\n", time);
-	// total_time__+=time;
 
 	/* PROCESS RESULTS */
 	int cnt = 0;
@@ -63,9 +60,6 @@ int main(int argc, char **argv) {
 	free(data);
 	free(radii2);
 	free(out);
-	// }
-
-	// printf("AVERAGE: %.6gs\n", total_time__/5.0);
 
 	return 0;
 }
