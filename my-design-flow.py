@@ -35,35 +35,35 @@ def gpu_decision(ast, data):
 def fpga_decision(ast, data):
     return [0,1]
 
-no_flow = design_flow('none')
+no_flow = DesignFlow('none')
 
-omp_flow = design_flow('omp')
+omp_flow = DesignFlow('omp')
 omp_flow.add_pattern(multithread_parallel_loops)
-omp_flow.add_pattern(omp_nthreads_dse)
+omp_flow.add_pattern(omp_nthreads_DSE)
 
-arria10_flow = design_flow('a10')
-arria10_flow.add_pattern(unroll_until_fpga_overmap, {'target':'a10'})
+arria10_flow = DesignFlow('a10')
+arria10_flow.add_pattern(unroll_until_fpga_overmap_DSE, {'target':'a10'})
 
-stratix10_flow = design_flow ('s10')
+stratix10_flow = DesignFlow('s10')
 stratix10_flow.add_pattern(use_oneapi_zerocopy_memory)
-stratix10_flow.add_pattern(unroll_until_fpga_overmap, {'target':'s10'})
+stratix10_flow.add_pattern(unroll_until_fpga_overmap_DSE, {'target':'s10'})
 
-oneapi_flow = design_flow('oneapi')
+oneapi_flow = DesignFlow('oneapi')
 oneapi_flow.add_pattern(generate_oneapi_design)
 oneapi_flow.add_pattern(employ_sp_fp_literals)
 oneapi_flow.add_pattern(employ_sp_math_fns)
 oneapi_flow.add_pattern(unroll_small_fixed_bound_loops)
 oneapi_flow.add_branchpoint(fpga_decision, [arria10_flow, stratix10_flow])
 
-ti2080_flow = design_flow('ti2080')
+ti2080_flow = DesignFlow('ti2080')
 # 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 2080 
 ti2080_flow.add_pattern(hip_blocksize_timing_DSE, {'device':'0'})
 
-ti1080_flow = design_flow('ti1080')
+ti1080_flow = DesignFlow('ti1080')
 # 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 1080 
 ti1080_flow.add_pattern(hip_blocksize_timing_DSE, {'device':'2'})
 
-hip_flow = design_flow('hip')
+hip_flow = DesignFlow('hip')
 hip_flow.add_pattern(generate_hip_design)
 hip_flow.add_pattern(employ_sp_fp_literals)
 hip_flow.add_pattern(employ_sp_math_fns)
@@ -72,12 +72,12 @@ hip_flow.add_pattern(employ_hip_pinned_memory)
 hip_flow.add_pattern(introduce_shared_mem_buffers)
 hip_flow.add_branchpoint(gpu_decision, [ti2080_flow, ti1080_flow])
 
-my_design_flow = design_flow('main')
+my_design_flow = DesignFlow('main')
 my_design_flow.add_pattern(extract_hotspot, {'filter_fn': parallel_filter,'fn_name': 'kernel___','threshold': 0.4})
 my_design_flow.add_pattern(remove_compound_assignment_deps)
-# my_design_flow.add_pattern(data_inout_analysis,{'exec_rule':'orig'})
-# my_design_flow.add_pattern(loop_tripcount_analysis,{'exec_rule':'orig'})
-# my_design_flow.add_pattern(arithmetic_intensity_analysis,{'exec_rule':'orig'})
+my_design_flow.add_pattern(data_inout_analysis,{'exec_rule':'orig'})
+my_design_flow.add_pattern(loop_tripcount_analysis,{'exec_rule':'orig'})
+my_design_flow.add_pattern(arithmetic_intensity_analysis,{'exec_rule':'orig'})
 my_design_flow.add_pattern(pointer_analysis)
 my_design_flow.add_pattern(loop_dependence_analysis)
 my_design_flow.add_branchpoint(branch_decision, [no_flow, omp_flow, oneapi_flow, hip_flow])
@@ -85,12 +85,11 @@ my_design_flow.add_branchpoint(branch_decision, [no_flow, omp_flow, oneapi_flow,
 # app = 'adpredictor'
 # app = 'nbody-sim'
 # app = 'bezier-surface' 
-app = 'rush-larsen' 
-# app = 'kmeans'  
+# app = 'rush-larsen' 
+app = 'kmeans'  
 
 src = f'cpp_apps/{app}/main.cpp'
 dest = f'gen/{app}'
 
 final_ast = my_design_flow.run(src, dest)
 pp.pprint(my_design_flow.data)
-

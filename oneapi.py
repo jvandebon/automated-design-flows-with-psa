@@ -245,7 +245,7 @@ def parse_unroll_pragmas(pragma):
     else:
         return False # exclude pragma
 
-def unroll_until_overmap_dse(ast, kernel, target='a10'):
+def unroll_until_overmap(ast, kernel, target='a10'):
     outer_loop = kernel.query('l{ForStmt}', where=lambda l: l.is_outermost())[0].l
     if not gen_oneapi_report(ast, target=target):
         return

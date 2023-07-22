@@ -4,7 +4,7 @@ from meta_cl import *
 from design_flow_patterns import *
 from normalisation import *
 
-class design_flow:
+class DesignFlow:
     def __init__(self, name):
         self.ast = None
         self.data = {}
