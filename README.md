@@ -9,11 +9,11 @@
 
 ### Repository Organisation
 * `cpp_apps/` contains unoptimised, single-thread software code for 5 example applications:
-  * `adpredictor/` - Bayesion advertisement click through rate predictor
-  * `bezier-surface/` - Bezier surface generation
-  * `kmeans/` - K-means classification
-  * `nbody-sim/` - N-body simulation
-  * `rush-larsen/` - Rush Larsen ODE solver
+  * `adpredictor/` - Bayesion advertisement click through rate predictor [^1]
+  * `bezier-surface/` - Bezier surface generation [^2]
+  * `kmeans/` - K-means classification [^3]
+  * `nbody-sim/` - N-body simulation [^3]
+  * `rush-larsen/` - Rush Larsen ODE solver [^2]
   * each of the above application folders has a `main.cpp` file containing the application logic, and a `meta_cl.make` file used as by Artisan meta-programs to compile and execute the code on various targets. To build and run each application as software, run `make cpu -f meta_cl.make` and `make run_cpu -f meta_cl.make`. 
 * `design_flow.py` contains the DesignFlow class specification 
 * `design_flow_patterns.py` contains all uniform, design-flow pattern implementations
@@ -24,6 +24,10 @@
 * `util.py` contains utility functions used by the implemented Artisan meta-programs
 * `my-design-flow.py` contains an example design-flow supporting multi-thread CPU, oneAPI CPU+FPGA, and HIP CPU+GPU design (described below)
 
+
+[^2]: modified from https://github.com/zjin-lcf/HeCBench
+[^3]: modified from https://github.com/maxeler/
+[^1]: based on [this paper](https://www.microsoft.com/en-us/research/publication/web-scale-bayesian-click-through-rate-prediction-for-sponsored-search-advertising-in-microsofts-bing-search-engine/)
 ### Run the Example Design-Flow
 
 The example design-flow in `my-design-flow.py` is illustrated in the following figure.
