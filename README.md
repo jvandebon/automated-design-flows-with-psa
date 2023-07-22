@@ -63,7 +63,7 @@ def decision_fn(ast, data):
 - `extract_hotspot(ast, data, filter_fn=outermost_filter, threshold=0.5, fn_name='__kernel__')`
    - **purpose**: dynamically identified the most time consuming program loop and extracts it into an isolated function
    - **optional parameters**:
-      - `filter_fn` specifies a filter to limit the loops profiled, by default we consider only outermost loops (see
+      - `filter_fn` specifies a filter to limit the loops profiled, by default we consider only outermost loops 
       - `threshold` specified the minimum percentage of overall program execution time that a hotspot must comprise
       -  `fn_name` specifies the name of the newly created hotspot function
 
