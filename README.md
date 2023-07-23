@@ -42,10 +42,16 @@ The resulting design(s) will be generated in a new folder, `gen/`, following the
 
 ### Compose a Custom Design-Flow 
 
-1. instantiate a top level DesignFlow object: `new_design_flow = DesignFlow('my-design-flow-name')`
-2. add patterns: `new_design_flow.add_pattern(pattern-name, {'optional-param1': val, 'optional-param2': val, ...})`
+1. instantiate a top level DesignFlow object:
+   
+   `new_design_flow = DesignFlow('my-design-flow-name')`
+3. add patterns:
+
+   `new_design_flow.add_pattern(pattern-name, {'optional-param1': val, 'optional-param2': val, ...})`
    - see the below catalogue of implemented patterns for pattern names and optional parameters
-3. add branch-points: `new_design_flow.add_branchpoint(decision_fn, [path1, path2])`
+5. add branch-points:
+
+   `new_design_flow.add_branchpoint(decision_fn, [path1, path2])`
    - define a decision function as a regular python function that accepts two parameters: `ast` (representing the current application design) and `data` (a dictionary representing the current design-flow state), and returns a list of integer value(s) representing indices into the path list corresponding to the path(s) to take
    - for example:  
 ```
