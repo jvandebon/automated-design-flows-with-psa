@@ -36,20 +36,21 @@ The implemented PSA-flow in `psa-flow.py` is illustrated in the following figure
 
 All patterns listed in repository on the left are implemented in `design_flow_patterns.py` as catalogued below. 
 
-Running the full PSA-flow to generate optimised designs:
-  * `artisan psa-flow.py <app_name> <uninformed (optional)>`
-      - app_name must be specified as one of the following: adpredictor, nbody-sim, bezier-surface, rush-larsen, kmeans
-      - by default, the design-flow will run with the illustrated path selection strategy plugged into branch point A, generating either one multi-thread CPU design, two CPU+FPGA designs (Arria10 and Stratix10), or two CPU+GPU designs (1080 Ti or 2080 Ti)
-      - you can optionally specify to run an 'uninformed' design flow which selects all paths at branch point A and generates five optimised designs (one for each target)
-      - note: you need to have access to the two GPUs and/or Intel board support packages for both FPGAs when generating GPU or FPGA designs
-      - resulting design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}-{device}` (e.g. a generated oneAPI CPU+FPGA design for AdPredictor targeting a Stratix10 platform will be output to `gen/adpredictor-oneapi-s10/`)
+**Running the full PSA-flow to generate optimised designs**:
+  * `artisan psa-flow.py <app_name> <uninformed(optional)>`
+      - app_name must be specified: `adpredictor`, `nbody-sim`, `bezier-surface`, `rush-larsen`, or `kmeans`
+      - by default, the illustrated path selection strategy is plugged into branch point A, generating either *one* multi-thread CPU design, *two* CPU+FPGA designs (Arria10 and Stratix10), or *two* CPU+GPU designs (1080 Ti or 2080 Ti)
+      - you can optionally specify `uninformed` to select all paths at branch point A and generate *five* designs (one for each target)
+      - design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}-{device}` (e.g. a generated oneAPI CPU+FPGA design for AdPredictor targeting a Stratix10 platform will be output to `gen/adpredictor-oneapi-s10/`)
+      - *note: you need access to the two NVIDIA GPUs and/or Intel FPGA board support packages to generate GPU or FPGA designs (see the partial PSA-flow option below for an alternative)*
 
-Running a partial version of the PSA-flow to generate diverse designs (lighter weight):
-   * if you do not have access to the hardware required to run the complete PSA-flow, this partial version (red box in the above figure) can be used to generate baseline designs for all three target types (OpenMP multi-thread CPU, HIP CPU+GPU, oneAPI CPU+FPGA) without running DSE patterns linked to execution on specific hardware
-   * run  `artisan partial-psa-flow.py <app_name> <target (optional)>`
-      - app_name must be specified as one of the following: adpredictor, nbody-sim, bezier-surface, rush-larsen, kmeans
-      - as above, by default, the design-flow will run with the illustrated path selection strategy plugged into branch point A, generating either a multi-thread CPU design, a CPU+FPGA design, or a CPU+GPU design
-      - you can optionally specify a target: cpu, fpga, gpu, or 'all'
+**Running a partial PSA-flow to generate baseline designs**:
+   * if you do not have access to the hardware required to run the complete PSA-flow, the partial version can be used to generate baseline designs for all three target types (OpenMP multi-thread CPU, HIP CPU+GPU, oneAPI CPU+FPGA)
+   * this version does not run  device-specific optimising DSE (see the red box in the above figure)
+   * `artisan partial-psa-flow.py <app_name> <target (optional)>`
+      - app_name must be specified: `adpredictor`, `nbody-sim`, `bezier-surface`, `rush-larsen`, or `kmeans`
+      - by default, the illustrated path selection strategy is plugged into branch point A, generating either a multi-thread CPU design, a CPU+FPGA design, or a CPU+GPU design
+      - you can optionally specify a target: `cpu`, `fpga`, `gpu`, or `all`
       - resulting design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}`
 
 ### Compose a Custom Design-Flow 
