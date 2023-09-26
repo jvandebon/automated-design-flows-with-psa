@@ -101,7 +101,8 @@ uninformed_design_flow = design_flow
 uninformed_design_flow.add_branchpoint(uninformed_branch_decision, [omp_flow, oneapi_flow, hip_flow])
 
 ## run the PSA-flows 
-         "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans ")    
+usage = ("Usage:\n  artisan psa-flow.py app_name <uninformed(optional)>\n"
+         "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans")    
 
 if len(sys.argv) < 2:
     print(usage)
