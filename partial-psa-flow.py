@@ -70,7 +70,7 @@ design_flow.add_pattern(loop_dependence_analysis)
 design_flow.add_branchpoint(branch_decision, [no_flow, omp_flow, oneapi_flow, hip_flow])
 
 ## run the PSA-flow 
-usage = ("Usage:\n  artisan psa-flow.py app_name <target>\n"
+usage = ("Usage:\n  artisan partial-psa-flow.py app_name <target>\n"
          "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans\n"
          "target = all | cpu | gpu | fpga ")    
 
