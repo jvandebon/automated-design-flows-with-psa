@@ -1,5 +1,12 @@
 # automated-design-flows-with-psa
 
+### Contents
+1. [Requirements](#requirements)
+2. [Repository Organisation](#repository-organisation)
+3. [Running the Implemented PSA-Flow](#running-the-implemented-psa-flow)
+4. [Composing Custom Design-Flows](#composing-custom-design-flows)
+5. [Catalogue of Implemented Patterns](#catalogue-of-implemented-patterns)
+
 ### Requirements
 * Download and install Artisan (https://github.com/custom-computing-ic/artisan)
 * Configure an Artisan Docker image with access to any/all of the following:
@@ -22,21 +29,33 @@
 * `profilers.py` contains Artisan meta-program code for dynamic profilers 
 * `oneapi.py`, `hip.py`, `openmp.py` contain framework-specific Artisan meta-programs 
 * `util.py` contains utility functions used by the implemented Artisan meta-programs
-* `my-design-flow.py` contains an example design-flow supporting multi-thread CPU, oneAPI CPU+FPGA, and HIP CPU+GPU design (described below)
+* `psa-flow.py` is an implemented design-flow supporting OpenMP multi-thread CPU, oneAPI CPU+FPGA, and HIP CPU+GPU design (described below)
+* `partial-psa-flow.py` is a reduced version of the design-flow in `psa-flow.py` which can be executed without access to specialised hardware (described below)
 
 [^2]: modified from https://github.com/zjin-lcf/HeCBench
 [^3]: modified from https://github.com/maxeler/
 [^1]: based on [this paper](https://www.microsoft.com/en-us/research/publication/web-scale-bayesian-click-through-rate-prediction-for-sponsored-search-advertising-in-microsofts-bing-search-engine/)
 
-### Run the Implemented PSA-Flow
+### Running the Implemented PSA-Flow
 
 The implemented PSA-flow in `psa-flow.py` is illustrated in the following figure.
 
 ![alt text](github-implementation.png)
 
-All patterns listed in repository on the left are implemented in `design_flow_patterns.py` as catalogued below. 
+**Overview**
 
-**Running the full PSA-flow to generate optimised designs**:
+This PSA-flow is able to generate OpenMP multi-thread CPU, HIP CPU+GPU, and oneAPI CPU+FPGA designs from arbitrary C++ source code inputs. Five target platforms are supported:
+  * 2 CPU+GPU platforms with NVIDIA GeForce GTX 1080 Ti and RTX 1080 Ti GPUs
+  * 2 CPU+FPGA platforms with Intel Arria10 and Stratix10 FPGAs
+  * 1 32-core AMD CPU platform 
+
+The design-flow begins with a series of target-independent tasks, including dynamic applicaction hotspot detection/extraction and various application analyses. 
+At the first branch point, a target platform type is selected (multi-thread CPU, CPU+GPU, or CPU+FPGA). The decision can either be informed, using the built-in path selection strategy (depicted), or uninformed, selecting all paths to generate multiple diverse design implementations. 
+Within the CPU+GPU and CPU+FPGA paths, there are further branch points specialising for specific GPU or FPGA devices. These branch points are uninformed by default (i.e. they always generate both designs). In the device-specific paths, fine-grained device-specific DSE is performed. 
+
+All of the design-flow tasks listed in the repository on the left are implemented in `design_flow_patterns.py` (see catalogue below). 
+
+#### How to run the full PSA-flow to generate optimised designs:
   * `artisan psa-flow.py <app_name> <uninformed(optional)>`
       - app_name must be specified: `adpredictor`, `nbody-sim`, `bezier-surface`, `rush-larsen`, or `kmeans`
       - by default, the illustrated path selection strategy is plugged into branch point A, generating either *one* multi-thread CPU design, *two* CPU+FPGA designs (Arria10 and Stratix10), or *two* CPU+GPU designs (1080 Ti or 2080 Ti)
@@ -44,16 +63,16 @@ All patterns listed in repository on the left are implemented in `design_flow_pa
       - design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}-{device}` (e.g. a generated oneAPI CPU+FPGA design for AdPredictor targeting a Stratix10 platform will be output to `gen/adpredictor-oneapi-s10/`)
       - *note: you need access to the two NVIDIA GPUs and/or Intel FPGA board support packages to generate GPU or FPGA designs (see the partial PSA-flow option below for an alternative)*
 
-**Running a partial PSA-flow to generate baseline designs**:
+#### How to run a partial PSA-flow to generate baseline designs:
    * if you do not have access to the hardware required to run the complete PSA-flow, the partial version can be used to generate baseline designs for all three target types (OpenMP multi-thread CPU, HIP CPU+GPU, oneAPI CPU+FPGA)
    * this version does not run  device-specific optimising DSE (see the red box in the above figure)
-   * `artisan partial-psa-flow.py <app_name> <target (optional)>`
+   * `artisan partial-psa-flow.py <app_name> <target(optional)>`
       - app_name must be specified: `adpredictor`, `nbody-sim`, `bezier-surface`, `rush-larsen`, or `kmeans`
       - by default, the illustrated path selection strategy is plugged into branch point A, generating either a multi-thread CPU design, a CPU+FPGA design, or a CPU+GPU design
       - you can optionally specify a target: `cpu`, `fpga`, `gpu`, or `all`
       - resulting design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}`
 
-### Compose a Custom Design-Flow 
+### Composing Custom Design-Flows
 
 1. instantiate a top level DesignFlow object:
    
@@ -79,7 +98,7 @@ def decision_fn(ast, data):
 5. when you have described all design-flow paths and branch points, execute the design flow using the `run()` method: `new_design_flow.run(src, dest)`, where `src` is the path(s) to input C++ source files, and `dest` is the path to an output folder for generated designs. 
 
 
-### Catalogue of Implemented Patterns:
+### Catalogue of Implemented Patterns
 
 `design_flow_patterns.py` contains implementations of the following patterns:
 
