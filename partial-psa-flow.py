@@ -24,7 +24,7 @@ def informed_branch_decision(ast, data):
                 else:
                     print("CPU+FPGA")
                     return [2]
-            else:   # no inner loops 
+            else:   # no inner loops
                 print("CPU+FPGA, CPU+GPU")
                 return [2,3]
         else:
@@ -43,14 +43,14 @@ omp_flow = DesignFlow('omp')
 omp_flow.add_pattern(multithread_parallel_loops)
 
 # construct oneAPI CPU+FPGA design-flow branch
-oneapi_flow = DesignFlow('oneapi')
+oneapi_flow = DesignFlow('oneapi', 'oneapi_fpga')
 oneapi_flow.add_pattern(generate_oneapi_design)
 oneapi_flow.add_pattern(employ_sp_fp_literals)
 oneapi_flow.add_pattern(employ_sp_math_fns)
 oneapi_flow.add_pattern(unroll_small_fixed_bound_loops)
 
 # construct HIP CPU+GPU design-flow branch
-hip_flow = DesignFlow('hip')
+hip_flow = DesignFlow('hip', 'hip_gpu')
 hip_flow.add_pattern(generate_hip_design)
 hip_flow.add_pattern(employ_sp_fp_literals)
 hip_flow.add_pattern(employ_sp_math_fns)
@@ -69,10 +69,10 @@ design_flow.add_pattern(pointer_analysis)
 design_flow.add_pattern(loop_dependence_analysis)
 design_flow.add_branchpoint(branch_decision, [no_flow, omp_flow, oneapi_flow, hip_flow])
 
-## run the PSA-flow 
+## run the PSA-flow
 usage = ("Usage:\n  artisan partial-psa-flow.py app_name <target>\n"
          "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans\n"
-         "target = all | cpu | gpu | fpga ")    
+         "target = all | cpu | gpu | fpga ")
 
 if len(sys.argv) < 2:
     print(usage)
@@ -101,5 +101,5 @@ if len(sys.argv) > 2:
 
 src = f'cpp_apps/{app}/main.cpp'
 dest = f'gen/{app}'
-print(f"Running the partial PSA-flow on {app} for {target}...")   
+print(f"Running the partial PSA-flow on {app} for {target}...")
 final_ast = design_flow.run(src, dest, args=args)
