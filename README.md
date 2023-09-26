@@ -53,9 +53,9 @@ The design-flow begins with a series of target-independent tasks, including dyna
 At the first branch point, a target platform type is selected (multi-thread CPU, CPU+GPU, or CPU+FPGA). The decision can either be informed, using the built-in path selection strategy (depicted), or uninformed, selecting all paths to generate multiple diverse design implementations. 
 Within the CPU+GPU and CPU+FPGA paths, there are further branch points specialising for specific GPU or FPGA devices. These branch points are uninformed by default (i.e. they always generate both designs). In the device-specific paths, fine-grained device-specific DSE is performed. 
 
-All patterns used in the PSA-flow (listed in the repository on the left) are implemented in `design_flow_patterns.py` as catalogued below. 
+All of the design-flow tasks listed in the repository on the left are implemented in `design_flow_patterns.py` (see catalogue below). 
 
-**How to run the full PSA-flow to generate optimised designs:**
+#### How to run the full PSA-flow to generate optimised designs:
   * `artisan psa-flow.py <app_name> <uninformed(optional)>`
       - app_name must be specified: `adpredictor`, `nbody-sim`, `bezier-surface`, `rush-larsen`, or `kmeans`
       - by default, the illustrated path selection strategy is plugged into branch point A, generating either *one* multi-thread CPU design, *two* CPU+FPGA designs (Arria10 and Stratix10), or *two* CPU+GPU designs (1080 Ti or 2080 Ti)
@@ -63,7 +63,7 @@ All patterns used in the PSA-flow (listed in the repository on the left) are imp
       - design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}-{device}` (e.g. a generated oneAPI CPU+FPGA design for AdPredictor targeting a Stratix10 platform will be output to `gen/adpredictor-oneapi-s10/`)
       - *note: you need access to the two NVIDIA GPUs and/or Intel FPGA board support packages to generate GPU or FPGA designs (see the partial PSA-flow option below for an alternative)*
 
-**How to run a partial PSA-flow to generate baseline designs:**
+#### How to run a partial PSA-flow to generate baseline designs:
    * if you do not have access to the hardware required to run the complete PSA-flow, the partial version can be used to generate baseline designs for all three target types (OpenMP multi-thread CPU, HIP CPU+GPU, oneAPI CPU+FPGA)
    * this version does not run  device-specific optimising DSE (see the red box in the above figure)
    * `artisan partial-psa-flow.py <app_name> <target(optional)>`
