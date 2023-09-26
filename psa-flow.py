@@ -24,7 +24,7 @@ def informed_branch_decision(ast, data):
                 else:
                     print("CPU+FPGA")
                     return [2]
-            else:   # no inner loops 
+            else:   # no inner loops
                 print("CPU+FPGA, CPU+GPU")
                 return [2,3]
         else:
@@ -57,7 +57,7 @@ stratix10_flow.add_pattern(use_oneapi_zerocopy_memory)
 stratix10_flow.add_pattern(unroll_until_fpga_overmap_DSE, {'target':'s10'})
 
 # construct oneAPI CPU+FPGA design-flow branch
-oneapi_flow = DesignFlow('oneapi')
+oneapi_flow = DesignFlow('oneapi', 'oneapi_fpga')
 oneapi_flow.add_pattern(generate_oneapi_design)
 oneapi_flow.add_pattern(employ_sp_fp_literals)
 oneapi_flow.add_pattern(employ_sp_math_fns)
@@ -66,16 +66,16 @@ oneapi_flow.add_branchpoint(fpga_decision, [arria10_flow, stratix10_flow])
 
 # construct RTX 2080 Ti CPU+GPU design-flow branch
 ti2080_flow = DesignFlow('ti2080')
-# 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 2080 
+# 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 2080
 ti2080_flow.add_pattern(hip_blocksize_timing_DSE, {'device':'0'})
 
 # construct GTX 1080 Ti CPU+GPU design-flow branch
 ti1080_flow = DesignFlow('ti1080')
-# 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 1080 
+# 'device' parameter indicates CUDA_VISIBLE_DEVICE required for Ti 1080
 ti1080_flow.add_pattern(hip_blocksize_timing_DSE, {'device':'2'})
 
 # construct HIP CPU+GPU design-flow branch
-hip_flow = DesignFlow('hip')
+hip_flow = DesignFlow('hip', 'hip_gpu')
 hip_flow.add_pattern(generate_hip_design)
 hip_flow.add_pattern(employ_sp_fp_literals)
 hip_flow.add_pattern(employ_sp_math_fns)
@@ -94,15 +94,15 @@ design_flow.add_pattern(arithmetic_intensity_analysis,{'exec_rule':'orig'})
 design_flow.add_pattern(pointer_analysis)
 design_flow.add_pattern(loop_dependence_analysis)
 
-# two design-flow versions: informed, uninformed 
+# two design-flow versions: informed, uninformed
 informed_design_flow = copy.deepcopy(design_flow)
 informed_design_flow.add_branchpoint(informed_branch_decision, [no_flow, omp_flow, oneapi_flow, hip_flow])
 uninformed_design_flow = design_flow
 uninformed_design_flow.add_branchpoint(uninformed_branch_decision, [omp_flow, oneapi_flow, hip_flow])
 
-## run the PSA-flows 
+## run the PSA-flows
 usage = ("Usage:\n  artisan psa-flow.py app_name <uninformed(optional)>\n"
-         "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans")    
+         "app_name = adpredictor | nbody-sim | bezier-surface | rush-larsen | kmeans")
 
 if len(sys.argv) < 2:
     print(usage)
@@ -123,11 +123,11 @@ elif len(sys.argv) > 2:
 src = f'cpp_apps/{app}/main.cpp'
 dest = f'gen/{app}'
 
-if informed: 
-    print(f"Running the informed PSA-flow on {app}...")   
+if informed:
+    print(f"Running the informed PSA-flow on {app}...")
     final_ast = informed_design_flow.run(src, dest)
 else:
-    print(f"Running the uninformed PSA-flow on {app}...")  
+    print(f"Running the uninformed PSA-flow on {app}...")
     final_ast = uninformed_design_flow.run(src, dest)
 
 # pp.pprint(informed_design_flow.data)

@@ -24,6 +24,10 @@ class DesignFlow:
             path.run(self.src, self.dest+f"-{path.name}", ast=self.ast, data=self.data)
 
     def add_branchpoint(self, branch_decision, flows):
+        # propagate cxx_spec from self to children
+        for f in flows:
+            if f.cxx_spec is None:
+                f.cxx_spec = self.cxx_spec
         self.flow.append((self.branchpoint, {'branch_decision': branch_decision, 'flows': flows}))
 
     def build_typedef_map(self):
