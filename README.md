@@ -4,18 +4,25 @@
 1. [Overview](#overview)
 2. [Installation](#installation)
 3. [Repository Organisation](#repository-organisation)
-4. [Running the Implemented PSA-Flow](#running-the-implemented-psa-flow)
+4. [PSA-Flow Description](#running-the-implemented-psa-flow)
 5. [Composing Custom Design-Flows](#composing-custom-design-flows)
 6. [Catalogue of Implemented Patterns](#catalogue-of-implemented-patterns)
 
 ### Overview
 
-<!-- This work shows
- The primary contribution of this work lies in its design principles, which enable the complete automation of mapping high-level software descriptions (entire applications) to optimized source code suitable for multi-core CPUs, GPUs, and FPGAs, utilizing OpenMP, HIP, and OneAPI. To our knowledge, there is no existing unified approach that covers automatic HW/SW partitioning (required to handle full applications, not just loop kernels), mapping, and optimization across these three platforms (refer to Section VII). Unlike previous meta-programming optimization approaches [4][5] that focus on specific targets, our paper introduces PSA (path-selection automation) flows which enable automated target selection using in-depth static (X) and dynamic (Y) analyses. This greatly enhances our ability to conduct cost, energy, and performance experiments across various platforms, all while allowing full customization of our optimization and analysis techniques. -->
+<p align="center">
+<img src="imgs/overview.png" alt="drawing" width="400"/>
+</p>
+
+This project introduces an innovative design-flow approach rooted in source-to-source transformations that can utomatically generate optimized designs for CPU, GPU, and FPGA platforms from an unmodified C++ application source code.
+
+To streamline manual optimization tasks, we leverage a meta-programming approach. This empowers us to programmatically codify and automate known optimization techniques, such as execute static code analysis, assess runtime behavior, and perform code transformations. Our meta-programs (included in this release) take the original source code as input, analyze it, and, if needed, make modifications that are human-readable.
+
+In this project, we expand upon prior meta-programming work to support **PSA (path-selection automation)-Flows**. These flows enable automated target selection through comprehensive static analyses (e.g., computing arithmetic intensity by inspecting the source code) and dynamic analyses (e.g., instrumenting the code to capture memory usage and data movement). This enhancement significantly improves our ability to conduct cost, energy, and performance experiments across various heterogeneous platforms while maintaining full customization of our optimization and analysis techniques.
 
 ### Installation
 
-Our PSA-flow framework is built on the foundations of Artisan (meta-programming) and targets OpenMP (multi-threaded CPU), HIP (CPU+GPU), and OneAPI (CPU+FPGA). To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks installed and configured. This image is available for download from the Docker Hub repository.
+Our PSA-flow framework is built on the foundations of Artisan (meta-programming) and targets OpenMP (multi-threaded CPU), HIP (CPU+GPU), and OneAPI (CPU+FPGA). To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. This image is available for download from the Docker Hub repository.
 
 To use our framework, follow these steps:
 
@@ -78,11 +85,11 @@ You can use the `artisan` script to work with the PSA-flows software. There are 
 [^3]: modified from https://github.com/maxeler/
 [^1]: based on [this paper](https://www.microsoft.com/en-us/research/publication/web-scale-bayesian-click-through-rate-prediction-for-sponsored-search-advertising-in-microsofts-bing-search-engine/)
 
-### Running the Implemented PSA-Flow
+### PSA-Flow Implementation
 
 The implemented PSA-flow in `psa-flow.py` is illustrated in the following figure.
 
-![alt text](github-implementation.png)
+![alt text](imgs/github-implementation.png)
 
 **Overview**
 
