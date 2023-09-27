@@ -6,6 +6,6 @@ ARTISAN_HUB_IMAGE=$DOCKER_HUB_USER/$ARTISAN_IMAGE
 
 docker tag $ARTISAN_IMAGE $ARTISAN_HUB_IMAGE
 docker push $ARTISAN_HUB_IMAGE
-docker rmi $HUB_IMAGE 2> /dev/null || true
+docker rmi $ARTISAN_HUB_IMAGE 2> /dev/null || true
 
 
