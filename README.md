@@ -27,7 +27,7 @@ To use our framework, follow these steps:
 #### B. Procedure
 1. Clone this repository to your preferred directory:
    ```bash
-   git clone https://github.com/your-username/psa-flow.git /path/to/psa-flow
+   git clone https://github.com/path/to/psa-flow.git /path/to/psa-flow
    ```
 2. Add the bin/ directory to your system's PATH:
    ```bash
