@@ -14,7 +14,7 @@
 <img src="imgs/overview.png" alt="drawing" width="400"/>
 </p>
 
-This project introduces an innovative design-flow approach based on source-to-source transformations, automatically optimizing CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) platforms using unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses that are typically performed manually, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
+This project demonstrates an innovative design-flow approach based on source-to-source transformations, which derives optimized CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) designs from unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses that are typically performed manually, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
 
 ### Installation
 
