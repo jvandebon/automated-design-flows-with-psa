@@ -1,4 +1,4 @@
-# Automated PSA-Flows
+# Automated PSA-flows
 
 ### Contents
 1. [Overview](#overview)
@@ -14,15 +14,11 @@
 <img src="imgs/overview.png" alt="drawing" width="400"/>
 </p>
 
-This project introduces an innovative design-flow approach rooted in source-to-source transformations that can utomatically generate optimized designs for CPU, GPU, and FPGA platforms from an unmodified C++ application source code.
-
-To streamline manual optimization tasks, we leverage a meta-programming approach. This empowers us to programmatically codify and automate known optimization techniques, such as execute static code analysis, assess runtime behavior, and perform code transformations. Our meta-programs (included in this release) take the original source code as input, analyze it, and, if needed, make modifications that are human-readable.
-
-In this project, we expand upon prior meta-programming work to support **PSA (path-selection automation)-Flows**. These flows enable automated target selection through comprehensive static analyses (e.g., computing arithmetic intensity by inspecting the source code) and dynamic analyses (e.g., instrumenting the code to capture memory usage and data movement). This enhancement significantly improves our ability to conduct cost, energy, and performance experiments across various heterogeneous platforms while maintaining full customization of our optimization and analysis techniques.
+This project introduces an innovative design-flow approach based on source-to-source transformations, automatically optimizing CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) platforms using unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses that are typically performed manually, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
 
 ### Installation
 
-Our PSA-flow framework is built on the foundations of Artisan (meta-programming) and targets OpenMP (multi-threaded CPU), HIP (CPU+GPU), and OneAPI (CPU+FPGA). To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. This image is available for download from the Docker Hub repository.
+Our PSA-flow framework is built on the foundations of Artisan (meta-programming) and targets OpenMP, HIP and oneAPI. To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. This image is available for download from the Docker Hub repository.
 
 To use our framework, follow these steps:
 
