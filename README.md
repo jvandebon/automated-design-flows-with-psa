@@ -14,13 +14,13 @@
 <img src="imgs/overview.png" alt="drawing" width="400"/>
 </p>
 
-This project demonstrates an innovative design-flow approach based on source-to-source transformations, which derives optimized CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) designs from unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses that are typically performed manually, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
+This project demonstrates an innovative design-flow approach based on source-to-source transformations, which automatically derives optimized CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) designs from complete unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
 
 ### Installation
 
-Our PSA-flow framework is built on the foundations of Artisan (meta-programming) and targets OpenMP, HIP and oneAPI. To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. This image is available for download from the Docker Hub repository.
+Our PSA-flow framework is built on the foundations of Artisan (meta-programming), and our metaprograms work across different targets, including OpenMP, HIP and oneAPI. To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. 
 
-To use our framework, follow these steps:
+To install our framework, follow these steps:
 
 #### A. Requirements
 
