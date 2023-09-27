@@ -1,10 +1,10 @@
 #!/bin/bash
 
 DOCKER_HUB_USER="ckiddo74"
-ORBITML_IMAGE="orbit_ml:latest"
+ARTISAN_IMAGE="artisan:fpt23"
 ORBITML_HUB_IMAGE=$DOCKER_HUB_USER/$ORBITML_IMAGE
 
 docker pull $ORBITML_HUB_IMAGE
 docker tag $ORBITML_HUB_IMAGE $ORBITML_IMAGE
-docker rmi $HUB_IMAGE 2> /dev/null || true   
+docker rmi $HUB_IMAGE 2> /dev/null || true
 

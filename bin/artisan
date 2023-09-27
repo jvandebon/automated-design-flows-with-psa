@@ -11,7 +11,7 @@ fi
 IMAGE_CHECK=`docker images -q $ARTISAN_IMAGE 2> /dev/null`
 
 if [[ (-z "$IMAGE_CHECK") ]]; then
-echo -e "[x] error: docker image not found: '$ARTISAN_IMAGE'! \n    (hint: run: 'orbit-build' or 'orbit-pull')"
+echo -e "[x] error: docker image not found: '$ARTISAN_IMAGE'! \n    (hint: run: 'artisan-pull')"
 exit -1
 fi
 
