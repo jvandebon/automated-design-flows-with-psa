@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DOCKER_HUB_USER="ckiddo74"
+ARTISAN_IMAGE="artisan:fpt23"
+ARTISAN_HUB_IMAGE=$DOCKER_HUB_USER/$ARTISAN_IMAGE
+
+docker tag $ARTISAN_IMAGE $ARTISAN_HUB_IMAGE
+docker push $ARTISAN_HUB_IMAGE
+docker rmi $HUB_IMAGE 2> /dev/null || true
+
+

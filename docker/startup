@@ -1,0 +1,26 @@
+#!/bin/bash
+
+export PS1="\e[0;35m\u@artisan\e[0;0m\e[0;32m$\w$ \e[m"
+export LS_OPTIONS='--color=auto'
+eval "$(dircolors -b)"
+alias ls="ls $LS_OPTIONS"
+
+# metacl
+export META_CL_CXXFLAGS="-I/opt/artisan/meta_cl/cpp/include"
+export META_CL_CXXFLAGS_FE="-I/usr/lib/llvm-13/lib/clang/13.0.1/include/"
+export META_CL_LDFLAGS="-lzmq"
+
+# oneapi_fpga
+export META_CL_CXXFLAGS_ONEAPI_FPGA="-std=c++17 -I/opt/intel/oneapi/compiler/2023.1.0/linux/include/sycl -I/opt/intel/oneapi/compiler/2023.1.0/linux/include/"
+source /opt/intel/oneapi/setvars.sh &> /dev/null
+
+# hip_gpu
+export META_CL_CXXFLAGS_HIP_GPU="-std=c++14"
+export META_CL_CXXFLAGS_FE_HIP_GPU="-x hip -fhip-new-launch-api"
+export HIP_PLATFORM=amd
+export PATH=/opt/rocm/bin:/opt/rocm/hip/bin:$PATH
+
+
+export PYTHONPATH="/opt/artisan:$PATH"
+
+cd /workspace

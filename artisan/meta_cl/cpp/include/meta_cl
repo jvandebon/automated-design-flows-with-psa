@@ -1,0 +1,220 @@
+#include <map>
+#include <string>
+#include <chrono>
+#include <thread>
+#include <cstdarg>
+#include <vector>
+#include <zmq.hpp>
+#include <exception>
+#include <boost/format.hpp>
+
+namespace meta_cl {
+/******************************************* MEM ***/
+#define META_CL_MEM_INIT std::map<void *, size_t> meta_cl::Mem::_sizes = std::map<void *, size_t>();
+
+template<typename... Arguments>
+std::string vstr(std::string const& fmt, Arguments&&... args)
+{
+    boost::format f(fmt);
+    int unroll[] {0, (f % std::forward<Arguments>(args), 0)...};
+    static_cast<void>(unroll);
+
+    return boost::str(f);
+}
+
+
+class Mem {
+public:
+template<class T>
+static void reg(T* ptr, size_t size) {
+    _sizes[(void *) ptr] = size;
+}
+
+template<class T>
+static size_t size(T *ptr) {
+    auto iter = _sizes.find((void *) ptr);
+    if (iter == _sizes.end()) {
+        throw std::runtime_error("meta_cl mem: cannot get size, pointer not found!");
+    } else {
+       return iter->second;
+    }
+}
+
+public:
+    static std::map<void *, size_t> _sizes;
+
+};
+
+/****************************************************************/
+class Timer
+{
+public:
+    Timer(double &time, bool ns=false) {
+        _startTime = std::chrono::system_clock::now();
+        _elapsed = &time;
+        _cb = nullptr;
+        _ns = ns;
+    }
+
+    Timer(void (*cb)(double d), bool ns=false) {
+        _startTime = std::chrono::system_clock::now();
+        _elapsed = nullptr;
+        _cb = cb;
+        _ns = ns;
+    }
+
+    ~Timer() {
+        auto endTime = std::chrono::system_clock::now();
+        if (_elapsed) {
+           if (_ns)  {
+              *_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - _startTime).count();
+           } else {
+              *_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - _startTime).count();
+           }
+        } else {            
+            double elapsed;
+            if (_ns)  {           
+               elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - _startTime).count();
+            } else {
+               elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - _startTime).count();
+            }
+            (*_cb)(elapsed);
+        }
+    }
+
+    static void sleep(int ms) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    }
+
+    static void sleep_ns(unsigned long ns) {
+        std::this_thread::sleep_for(std::chrono::nanoseconds(ns));
+    }    
+
+protected:
+    std::chrono::time_point<std::chrono::system_clock> _startTime;
+    double *_elapsed;
+    void (*_cb)(double);
+    bool _ns;
+};
+
+class Report {
+
+private:
+    static bool& debug() {
+        static bool _debug;
+
+        return _debug;
+
+    }
+
+    static std::string& buffer() {
+        static std::string _buffer;
+        return _buffer;
+    }
+
+    static zmq::context_t** context() {
+        static zmq::context_t *_context;
+        return &_context;
+    }
+
+    static zmq::socket_t** socket() {
+        static zmq::socket_t *_socket;
+        return &_socket;
+    }
+
+public:
+    static void reserve(size_t size) {
+
+       std::string &_buffer = buffer();
+        _buffer.reserve(size);
+    }
+
+    static void connect(const char* host="localhost", int port=9865) {
+        
+        reserve(10000);
+
+        bool &_debug = debug();
+
+        _debug = (host == nullptr);
+
+        if (_debug) return;
+
+        zmq::context_t** _context = context();
+        *_context = new zmq::context_t(1);
+
+        zmq::socket_t** _socket = socket();
+        *_socket = new zmq::socket_t(**_context, ZMQ_PUSH);
+    
+        (*_socket)->connect(vstr("tcp://%1%:%2%", host, port));
+
+
+    }
+
+    template <typename... Arguments>
+    static void write(std::string const& fmt, Arguments&&... args) {
+        boost::format f(fmt);
+        int unroll[] {0, (f % std::forward<Arguments>(args), 0)...};
+        static_cast<void>(unroll);
+
+        std::string &_buffer = buffer();
+        _buffer += boost::str(f);
+
+    }
+
+    template <typename... Arguments>
+    static void emit(std::string const& fmt, Arguments&&... args) {
+        boost::format f(fmt);
+        int unroll[] {0, (f % std::forward<Arguments>(args), 0)...};
+        static_cast<void>(unroll);
+
+        std::string &_buffer = buffer();
+        _buffer += boost::str(f);
+        emit();
+
+    }
+
+
+    static void emit() {
+        std::string &_buffer = buffer();
+
+        bool &_debug = debug();
+
+        if (_debug) {
+            printf("%s", _buffer.c_str());
+
+        } else {
+            zmq::socket_t** sock = socket();
+
+            if (_buffer.size() != 0) {
+                zmq::message_t msg(_buffer.c_str(), _buffer.size());
+            (*sock)->send(msg, zmq::send_flags::none);
+            }
+        }
+
+        
+        _buffer.erase();
+
+    }
+
+    static void disconnect() {
+        bool &_debug = debug();
+
+        if (_debug) {
+            return;
+        }
+
+        zmq::context_t** _context = context();
+        zmq::socket_t** _socket = socket();
+
+        (*_socket)->send(zmq::message_t("", 0), zmq::send_flags::none);
+
+        delete *_socket;
+        delete *_context;
+
+    }
+
+};
+
+}
+
+

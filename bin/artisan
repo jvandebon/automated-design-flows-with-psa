@@ -1,0 +1,55 @@
+#!/bin/bash
+
+ARTISAN_IMAGE="artisan:fpt23"
+CONFIG_DIR=$HOME/.artisan
+
+if [[ ! -f $CONFIG_DIR ]]; then
+    mkdir -p $CONFIG_DIR
+fi
+
+# check if image exists
+IMAGE_CHECK=`docker images -q $ARTISAN_IMAGE 2> /dev/null`
+
+if [[ (-z "$IMAGE_CHECK") ]]; then
+echo -e "[x] error: docker image not found: '$ARTISAN_IMAGE'! \n    (hint: run: 'orbit-build' or 'orbit-pull')"
+exit -1
+fi
+
+DOCKER_UID=$(id -u)
+DOCKER_GID=$(id -g)
+
+if [[ ! -f $CONFIG_DIR/passwd ]]; then
+getent passwd $DOCKER_UID > $CONFIG_DIR/passwd
+getent passwd 0 >> $CONFIG_DIR/passwd
+echo "_apt:x:104:65534::/nonexistent:/usr/sbin/nologin" >> $CONFIG_DIR/passwd
+fi
+
+if [[ ! -f $CONFIG_DIR/group ]]; then
+getent group $DOCKER_GID > $CONFIG_DIR/group
+echo "root:x:0:" >> $CONFIG_DIR/group
+echo "crontab:x:105:" >> $CONFIG_DIR/group
+echo "messagebus:x:104:" >> $CONFIG_DIR/group
+echo "sudo:x:`getent group sudo | cut -d: -f3`" >> $CONFIG_DIR/group
+fi
+
+if [[ ! -f $CONFIG_DIR/shadow ]]; then
+echo "$(id -u -n):\$6\$saltsalt\$bAY90rAsHhyx.bxmKP9FE5UF4jP1iWgjV0ltM6ZJxfYkiIaCExjBZIbfmqmZEWoR65aM.1nFvG7fF3gYOjHpM.:18229:0:99999:7:::" > $CONFIG_DIR/shadow
+fi
+
+VOLARGS=" --group-add sudo --volume=$CONFIG_DIR/group:/etc/group --volume=$CONFIG_DIR/passwd:/etc/passwd  --volume=$CONFIG_DIR/shadow:/etc/shadow --user $DOCKER_UID:$DOCKER_GID"
+
+# create home directory in temp
+tmp_dir=$(mktemp -d -t artisan-XXXXXXXXXX)
+# avoid error when running vscode terminal
+touch $tmp_dir/.bashrc
+# avoid sudo message
+touch $tmp_dir/.sudo_as_admin_successful
+
+docker run --rm -ti \
+                --net=host \
+                -v $PWD:/workspace \
+                -w /workspace \
+                $ORBIT_ARGS \
+                $VOLARGS \
+                --volume="$tmp_dir:$HOME" \
+                $ARTISAN_IMAGE "$@"

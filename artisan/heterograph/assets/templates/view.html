@@ -1,0 +1,162 @@
+<html>
+    <head>
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <script
+           src="https://code.jquery.com/jquery-3.4.1.min.js"
+           integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+           crossorigin="anonymous">
+        </script>
+        <script src="{{ url_for('static', filename='d3-tip.js')}}"></script>
+        <link href="{{ url_for('static', filename='smartmenus/css/sm-core-css.css')}}" rel='stylesheet' type='text/css' />
+        <link href="{{ url_for('static', filename='smartmenus/css/sm-clean/sm-clean.css')}}" rel='stylesheet' type='text/css'>
+        <link href="{{ url_for('static', filename='smartmenus/css/view.css')}}" rel='stylesheet' type='text/css' />
+
+    </head>
+
+    <body onload="load_data('first')">
+            <nav class="main-nav" role="navigation">
+                    <h2 class="nav-brand"><a href="#"><span id="title"></span></a></h2>
+                    <ul id="main-menu" class="sm sm-rtl sm-clean">
+                            <li><a href="#" onclick="$.post('/shutdown')">⏼</a>
+                            <li><a href="#" onclick="location.reload();">🗘</a>
+                            <li><a href="#" onclick="load_data('next')">🡺</a>
+                            <li><a href="#" onclick="load_data('prev')">🡸</a>
+                    </ul>
+                    <h2 class="nav-counter"><a href="#">graph: <span id="graph-index"></span> of <span id="num-graphs"></span></a></h2>
+                    <h2 class="nav-counter"><a href="#"><font size="-1" color="#AA8" face="Courier New">{{run_loc}}</font></a></h2>
+            </nav>
+            <div>
+                <svg id="canvas" width="100%" height="100%"></svg>
+            </div>
+
+        <style>
+            .d3-tip {
+                line-height: 1;
+                padding: 6px;
+                background: rgba(0, 0, 0, 0.5);
+                color: #fff;
+                border-radius: 4px;
+                font-size: 16px;
+                font-family: Arial, Helvetica, sans-serif;
+
+            }
+
+            .node {
+                cursor: crosshair;
+                stroke-width: 1;
+            }
+
+            .edge {
+                cursor: crosshair;
+                stroke-width: 1;
+            }
+
+            #graph-info {
+                color: #cc6e6e;
+                text-align: center;
+                font-family: Arial, Helvetica, sans-serif;
+            }
+        </style>
+
+
+        <script type="text/javascript" src="{{ url_for('static', filename='smartmenus/jquery.smartmenus.min.js')}}"></script>
+        <script type="text/javascript">
+            $(function() {
+                $('#main-menu').smartmenus({
+                    mainMenuSubOffsetX: -1,
+                    mainMenuSubOffsetY: 4,
+                    subMenusSubOffsetX: 6,
+                    subMenusSubOffsetY: -6
+                });
+            });
+        </script>
+
+        <script>
+
+           function load_data(cmd) {
+
+               d3.json(cmd).then(data => {
+
+                   document.getElementById('graph-index').innerHTML = data['index'] + 1
+                   document.getElementById('num-graphs').innerHTML = data['ngraphs']
+                   document.getElementById('title').innerHTML = data['title']
+                   var hover = data['hover']
+
+                   if (data['ngraphs'] == 0) {
+                       return
+                   }
+
+                   parser = new DOMParser();
+                   svg_spec = parser.parseFromString(data['svg'],"text/xml").documentElement.children[0];
+                   var dom_svg = document.getElementById('canvas')
+                   if (dom_svg.hasChildNodes()) {
+                       dom_svg.removeChild(dom_svg.firstChild);
+                   }
+                   dom_svg.append(svg_spec)
+                   var dom_g = dom_svg.firstElementChild
+                   var zoom = d3.zoom().on("zoom",
+                        function() {
+                            g.attr("transform", d3.event.transform);
+                        }
+                    );
+
+                   var svg = d3.select("#canvas").call(zoom)
+                   var g = svg.select("g")
+
+                   var node_map = [];
+                   g.selectAll(".node").select(function() {
+                       var tags_title = this.getElementsByTagName("title");
+                       if (tags_title.length > 0) {
+                         node_map.push(parseInt(tags_title[0].innerHTML));
+                       }
+                   });
+
+                   var edge_map = [];
+                   g.selectAll(".edge").select(function() {
+                       var tags_title = this.getElementsByTagName("title");
+                       if (tags_title.length > 0) {
+                         str = tags_title [0].innerHTML;
+                         str=str.replace("-&gt;", ",")
+
+
+                         edge_map.push(str.split(","));
+                       }
+                   });
+
+                   svg.selectAll('title').remove()
+
+                   if (hover) {
+                        g.selectAll(".node").on('mouseover', function (id) {
+                            n = this;
+                            $.get('/hover/' + id, function(req) { });
+                        }).data(node_map);
+
+                        g.selectAll(".edge").on('mouseover', function (id) {
+                            n = this;
+                            $.get('/hover/' + id, function(req) { });
+                        }).data(edge_map).select('path').clone().attr('stroke-width', 20).attr('stroke-opacity', '0');
+
+
+                   }
+                   /*
+                   g.selectAll(".edge").on('mouseover', tip_edge.show).on('mouseout', tip_edge.hide).data(tooltip_data['edge'])
+                            .select('path').clone().attr('stroke-width', 20).attr('stroke-opacity', '0')
+                   */
+
+                   var svg_rect = dom_svg.getBoundingClientRect()
+                   var g_bbox = dom_g.getBBox()
+
+                   // prevent to overblow
+                   var initialScale = Math.min(Math.min(svg_rect.width/g_bbox.width, svg_rect.height/g_bbox.height) * 0.8, 1.4)
+
+
+                   svg.call(zoom.transform, d3.zoomIdentity.translate((svg_rect.width-g_bbox.width*initialScale)/2,
+                                                                      (g_bbox.height*initialScale + svg_rect.height-80)/2  )
+                                                            .scale(initialScale))
+
+               })
+           }
+
+        </script>
+    </body>
+</html>

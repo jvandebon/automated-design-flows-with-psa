@@ -1,0 +1,13 @@
+#!/bin/bash
+
+ARTISAN_ROOT=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )/..
+ARTISAN_IMAGE="artisan:fpt23"
+
+# exports
+rm -rf $ARTISAN_ROOT/docker/exports
+mkdir -p $ARTISAN_ROOT/docker/exports
+cp $ARTISAN_ROOT/artisan  $ARTISAN_ROOT/docker/exports/ -R
+
+cd $ARTISAN_ROOT/docker && docker build -t $ARTISAN_IMAGE .
+
+rm -rf $ARTISAN_ROOT/docker/exports

@@ -1,4 +1,4 @@
-CXX =clang++ #hipcc #dpcpp  
+CXX =clang++ #hipcc #dpcpp
 CXXFLAGS = -O2 -g -lm $(META_CL_CXXFLAGS)
 LDFLAGS = $(META_CL_LDFLAGS)
 
@@ -16,7 +16,7 @@ small: $(EXE_NAME)
 
 orig: $(EXE_NAME)
 	./$(EXE_NAME) $(ORIG_ARGS)
-	
+
 $(EXE_NAME): $(SOURCES)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(EXE_NAME) $(SOURCES)
 
@@ -28,7 +28,7 @@ run_gpu: $(EXE_NAME)_gpu
 
 run_omp: $(EXE_NAME)_omp
 	./$(EXE_NAME)_omp $(ARGS)
-	
+
 $(EXE_NAME)_omp: $(SOURCES)
 	g++ $(CXXFLAGS)  -fopenmp -o $(EXE_NAME)_omp $(SOURCES) $(LDFLAGS)
 
@@ -43,7 +43,7 @@ s10_report: s10_report.a
 dev_s10.o: $(SOURCES)
 	dpcpp  $(CXXFLAGS)  -fintelfpga -c $^ -o $@ -DFPGA=1
 s10_report.a: dev_s10.o
-	dpcpp  $(CXXFLAGS)  -fintelfpga -fsycl-link $^ -o $@ -Xshardware -Xsboard=/workspace/intel_s10sx_pac:pac_s10_usm
+	dpcpp  $(CXXFLAGS)  -fintelfpga -fsycl-link $^ -o $@ -Xshardware -Xsboard=intel_s10sx_pac:pac_s10_usm
 
 clean:
 	rm -f $(EXE_NAME) outputs.txt

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+ARGS="${@@Q}"
+
+if [ $# != 0 ]; then
+   # we need to invoke startup, since -c does not source .bashrc
+   if [[ "$1" == "--" ]]; then
+      shift
+      ARGS="${@@Q}"
+      /bin/bash -c "source /etc/artisan/startup; $ARGS"
+   else
+      /bin/bash -c "source /etc/artisan/startup; python3 $ARGS"
+   fi
+
+else
+   /bin/bash
+fi
