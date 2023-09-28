@@ -4,7 +4,7 @@
 1. [Overview](#overview)
 2. [Installation](#installation)
 3. [Repository Organisation](#repository-organisation)
-4. [PSA-Flow Description](#running-the-implemented-psa-flow)
+4. [PSA-Flow Implementation](#psa-flow-implementation)
 5. [Composing Custom Design-Flows](#composing-custom-design-flows)
 6. [Catalogue of Implemented Patterns](#catalogue-of-implemented-patterns)
 
@@ -200,7 +200,7 @@ def decision_fn(ast, data):
 - `hip_blocksize_timing_DSE(ast, data, device=None)`
    - **purpose**: performs a dynamic, hill-climbing DSE to iteratively determine the blocksize that minimises execution time on a specific GPU target
    - **optional parameters**:
-       -
+     - `device` specifies the target GPU 
 
 - `multithread_parallel_loops(ast, data, *args)`
    - **purpose**: inserts require boilerplate OpenMP code and injects directives above parallel program loops indicating that they should be executed on multiple threads (e.g. `#pragma omp parallel for num_threads(N)`
