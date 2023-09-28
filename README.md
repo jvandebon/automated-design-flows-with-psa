@@ -4,8 +4,8 @@
 1. [Overview](#overview)
 2. [Installation](#installation)
 3. [Repository Organisation](#repository-organisation)
-4. [PSA-Flow Implementation](#psa-flow-implementation)
-5. [Composing Custom Design-Flows](#composing-custom-design-flows)
+4. [PSA-flow Implementation](#psa-flow-implementation)
+5. [Composing Custom PSA-flows](#composing-custom-psa-flows)
 6. [Catalogue of Implemented Patterns](#catalogue-of-implemented-patterns)
 
 ### Overview
@@ -14,11 +14,15 @@
 <img src="imgs/overview.png" alt="drawing" width="400"/>
 </p>
 
-This project demonstrates an innovative design-flow approach based on source-to-source transformations, which automatically derives optimized CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) designs from complete unmodified C++ application source code. Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications. Building upon prior work, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
+This project demonstrates an innovative design-flow approach based on source-to-source transformations, which automatically derives optimized CPU (OpenMP), GPU (HIP), and FPGA (oneAPI) designs from complete unmodified C++ application source code.
+
+* Leveraging meta-programming, we automate manual optimization tasks, including static code analysis, runtime behavior assessment, and code transformations, ensuring human-readable modifications.
+
+* Building upon prior work on design-flows, we introduce **PSA (Path-Selection Automation)-flows**, facilitating automated target selection via comprehensive static and dynamic analyses, thereby enhancing our capacity to conduct cost, energy, and performance experiments across diverse platforms while retaining full customization of our optimization and analysis techniques.
 
 ### Installation
 
-Our PSA-flow framework is built on the foundations of Artisan (meta-programming), and our metaprograms work across different targets, including OpenMP, HIP and oneAPI. To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured. 
+Our PSA-flow framework is built on the foundations of Artisan (meta-programming), and our metaprograms work across different targets, including OpenMP, HIP and oneAPI. To replicate, tailor, or expand upon our work, we've curated a Docker image with these frameworks already installed and configured.
 
 To install our framework, follow these steps:
 
@@ -81,7 +85,7 @@ You can use the `artisan` script to work with the PSA-flows software. There are 
 [^3]: modified from https://github.com/maxeler/
 [^1]: based on [this paper](https://www.microsoft.com/en-us/research/publication/web-scale-bayesian-click-through-rate-prediction-for-sponsored-search-advertising-in-microsofts-bing-search-engine/)
 
-### PSA-Flow Implementation
+### PSA-flow Implementation
 
 The implemented PSA-flow in `psa-flow.py` is illustrated in the following figure.
 
@@ -117,7 +121,7 @@ All of the design-flow tasks listed in the repository on the left are implemente
       - you can optionally specify a target: `cpu`, `fpga`, `gpu`, or `all`
       - resulting design(s) will be generated at the following path: `gen/{app-name}-{hip|oneapi|openmp}`
 
-### Composing Custom Design-Flows
+### Composing Custom PSA-flows
 
 1. instantiate a top level DesignFlow object:
 
@@ -200,7 +204,7 @@ def decision_fn(ast, data):
 - `hip_blocksize_timing_DSE(ast, data, device=None)`
    - **purpose**: performs a dynamic, hill-climbing DSE to iteratively determine the blocksize that minimises execution time on a specific GPU target
    - **optional parameters**:
-     - `device` specifies the target GPU 
+     - `device` specifies the target GPU
 
 - `multithread_parallel_loops(ast, data, *args)`
    - **purpose**: inserts require boilerplate OpenMP code and injects directives above parallel program loops indicating that they should be executed on multiple threads (e.g. `#pragma omp parallel for num_threads(N)`
